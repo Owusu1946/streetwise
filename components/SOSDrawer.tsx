@@ -50,9 +50,7 @@ export default function SOSDrawer({
 
   // Get emergency number based on location
   const getEmergencyNumber = () => {
-    // For now, default to French numbers
-    // In production, use geolocation API to detect country
-    return '17' // French police
+    return '911' // Ghana police
   }
 
   // Send SMS alert to contacts
