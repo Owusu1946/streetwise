@@ -1,0 +1,81 @@
+{
+  "name": "Streetwise - Safe Walking Navigation | The Waze for Pedestrians",
+  "short_name": "Streetwise",
+  "description": "Navigate cities safely with Streetwise. Get safe walking routes, real-time incident reports, avoid dangerous areas. The Waze for pedestrians - 100% free safe route planner.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#6366f1",
+  "background_color": "#000000",
+  "lang": "en-US",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/logo-mobile-streetwise.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/logo-mobile-streetwise.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "splash_pages": null,
+  "categories": ["navigation", "travel", "safety", "lifestyle", "utilities"],
+  "iarc_rating_id": "e84b072d-71b3-4d3e-86ae-31a8ce4e53b7",
+  "screenshots": [
+    {
+      "src": "/showcase.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "label": "Streetwise app interface showing safe route navigation"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Report Danger",
+      "short_name": "Report",
+      "description": "Report a dangerous situation in your area",
+      "url": "/?action=report",
+      "icons": [
+        {
+          "src": "/shield-icon.png",
+          "sizes": "96x96"
+        }
+      ]
+    },
+    {
+      "name": "Find Safe Route",
+      "short_name": "Navigate",
+      "description": "Plan a safe walking route",
+      "url": "/?action=navigate",
+      "icons": [
+        {
+          "src": "/shield-icon2.png",
+          "sizes": "96x96"
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    "geolocation"
+  ],
+  "prefer_related_applications": false,
+  "related_applications": []
+}

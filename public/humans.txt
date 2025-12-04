@@ -1,0 +1,26 @@
+/* TEAM */
+	Product: Streetwise
+	Mission: Making cities safer for pedestrians
+	Contact: hello@street-wise.app
+	Twitter: @streetwise_app
+	From: Built by young people for young people
+
+/* THANKS */
+	Community: All our users who report incidents and help make streets safer
+	OpenStreetMap: For mapping data
+	Public Safety Data: Cities providing open safety data
+
+/* SITE */
+	Last update: 2024/11/17
+	Language: English
+	Standards: HTML5, CSS3, ES6+
+	Components: Next.js, React, Mapbox, TailwindCSS, Supabase
+	Software: VS Code, Git, Vercel
+
+/* MISSION */
+	Streetwise is the Waze for pedestrians.
+	We help users plan routes that avoid risky areas and prioritize safer streets.
+	Our goal: Empower citizens to take back control of their safety through
+	collective awareness, smart technology, and solidarity.
+
+	100% free to use. Always.

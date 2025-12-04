@@ -1,0 +1,23 @@
+# Ignore artifacts:
+build
+coverage
+node_modules
+.next
+out
+dist
+
+# Ignore files:
+*.min.js
+*.min.css
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Ignore all markdown files:
+*.md
+
+# Ignore specific folders
+public/
+.vercel
+.env
+.env.*

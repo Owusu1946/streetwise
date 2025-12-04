@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+        xmlns:mobile="http://www.google.com/schemas/sitemap-mobile/1.0">
+
+  <!-- Main page -->
+  <url>
+    <loc>https://street-wise.app/</loc>
+    <lastmod>2024-11-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+    <mobile:mobile/>
+    <image:image>
+      <image:loc>https://street-wise.app/showcase.png</image:loc>
+      <image:title>Streetwise Safe Walking Navigation</image:title>
+      <image:caption>Navigate cities safely with Streetwise - The Waze for pedestrians</image:caption>
+    </image:image>
+  </url>
+
+  <!-- Report incident page (if accessed directly) -->
+  <url>
+    <loc>https://street-wise.app/?action=report</loc>
+    <lastmod>2024-11-17</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+    <mobile:mobile/>
+  </url>
+
+  <!-- Fake call feature -->
+  <url>
+    <loc>https://street-wise.app/fake-call</loc>
+    <lastmod>2024-11-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+    <mobile:mobile/>
+  </url>
+
+</urlset>

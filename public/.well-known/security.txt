@@ -1,0 +1,13 @@
+# Security Policy for Streetwise
+
+Contact: security@street-wise.app
+Expires: 2025-12-31T23:59:59.000Z
+Encryption: https://street-wise.app/pgp-key.txt
+Acknowledgments: https://street-wise.app/security-thanks
+Preferred-Languages: en
+Canonical: https://street-wise.app/.well-known/security.txt
+Policy: https://street-wise.app/security-policy
+
+# Our commitment to security
+# Streetwise takes the security and privacy of our users seriously.
+# We appreciate responsible disclosure of any security vulnerabilities.
