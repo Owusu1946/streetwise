@@ -1,5 +1,5 @@
-import Map from '@/components/Map'
 import { Metadata } from 'next'
+import HomePage from './HomePage'
 
 export const metadata: Metadata = {
   title: 'Streetwise - Safe Walking Navigation | Navigate Cities Safely',
@@ -13,10 +13,6 @@ export const metadata: Metadata = {
   },
 }
 
-export default function Home() {
-  return (
-    <div className="h-screen w-screen relative overflow-hidden">
-      <Map />
-    </div>
-  )
+export default function Page() {
+  return <HomePage />
 }

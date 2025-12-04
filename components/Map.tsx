@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ShimmerButton } from '@/components/ui/shimmer-button'
-import { MessageCircleHeart, Navigation, Search, Building2 } from 'lucide-react'
+import { Bus, MessageCircleHeart, Navigation, Search, Building2, Layers } from 'lucide-react'
 import mapboxgl from 'mapbox-gl'
 import { useTheme } from 'next-themes'
 import { useRouter } from 'next/navigation'
@@ -24,9 +24,10 @@ import { WeatherWidget } from './WeatherWidget'
 
 interface MapProps {
   className?: string
+  onEnterTroskiMode?: () => void
 }
 
-function MapComponent({ className = '' }: MapProps) {
+function MapComponent({ className = '', onEnterTroskiMode }: MapProps) {
   const router = useRouter()
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<mapboxgl.Map | null>(null)
@@ -52,6 +53,9 @@ function MapComponent({ className = '' }: MapProps) {
 
   // 3D Mode state
   const [is3DMode, setIs3DMode] = useState(false)
+
+  // Map View Mode state
+  const [mapViewMode, setMapViewMode] = useState<'standard' | 'satellite'>('standard')
 
   // Auto-popup timer
   useEffect(() => {
@@ -159,17 +163,22 @@ function MapComponent({ className = '' }: MapProps) {
     }
   }, [getUserLocation])
 
-  // Update map style when theme changes
+  // Update map style when theme or view mode changes
   useEffect(() => {
     if (!map.current || !mapLoaded) return
 
-    const mapStyle =
-      resolvedTheme === 'dark'
-        ? 'mapbox://styles/mapbox/dark-v11'
-        : 'mapbox://styles/mapbox/light-v11'
+    let mapStyle = ''
+    if (mapViewMode === 'satellite') {
+      mapStyle = 'mapbox://styles/mapbox/satellite-streets-v12'
+    } else {
+      mapStyle =
+        resolvedTheme === 'dark'
+          ? 'mapbox://styles/mapbox/dark-v11'
+          : 'mapbox://styles/mapbox/light-v11'
+    }
 
     map.current.setStyle(mapStyle)
-  }, [resolvedTheme, mapLoaded])
+  }, [resolvedTheme, mapLoaded, mapViewMode])
 
   // Handle 3D Mode toggle
   useEffect(() => {
@@ -572,6 +581,27 @@ function MapComponent({ className = '' }: MapProps) {
           >
             <Building2 className="h-5 w-5" />
           </button>
+
+          {/* Map Style Toggle Button */}
+          <button
+            onClick={() => setMapViewMode(prev => prev === 'standard' ? 'satellite' : 'standard')}
+            className={`absolute top-36 right-4 z-10 rounded-full p-3 shadow-md hover:shadow-lg transition-all border border-border ${mapViewMode === 'satellite' ? 'bg-primary text-primary-foreground' : 'bg-card text-foreground'
+              }`}
+            aria-label="Toggle Satellite View"
+          >
+            <Layers className="h-5 w-5" />
+          </button>
+
+          {/* Troski Mode Button */}
+          {onEnterTroskiMode && (
+            <button
+              onClick={onEnterTroskiMode}
+              className="absolute top-52 right-4 z-10 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full p-3 shadow-md hover:shadow-lg transition-all"
+              aria-label="Troski Mode"
+            >
+              <Bus className="h-5 w-5" />
+            </button>
+          )}
 
           {/* Bottom controls */}
           <div className="fixed bottom-0 left-0 right-0 z-30 pointer-events-none">
