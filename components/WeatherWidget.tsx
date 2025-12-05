@@ -67,8 +67,8 @@ export function WeatherWidget({ lat, lng }: WeatherWidgetProps) {
         const day = date.getDate()
 
         if (month < 3) {
-            year - 1
-            month + 12
+            year -= 1
+            month += 12
         }
 
         const c = 365.25 * year
