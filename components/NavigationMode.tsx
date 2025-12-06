@@ -234,7 +234,7 @@ export default function NavigationMode({
           initial={{ y: -100 }}
           animate={{ y: 0 }}
           exit={{ y: -100 }}
-          className="fixed top-0 m-4 rounded-2xl left-0 right-0 z-40 bg-background text-background-foreground shadow-lg overflow-hidden"
+          className="fixed top-0 m-2 sm:m-4 rounded-xl sm:rounded-2xl left-0 right-0 z-40 bg-background text-background-foreground shadow-lg overflow-hidden"
         >
           {/* Progress bar at top */}
           {totalDistance && totalDistance > 0 && (
@@ -248,22 +248,24 @@ export default function NavigationMode({
             </div>
           )}
 
-          <div className="p-4">
-            <div className="flex items-center gap-4">
-              <div className="bg-white text-black rounded-lg p-2">
+          <div className="p-3 sm:p-4">
+            <div className="flex items-center gap-3 sm:gap-4">
+              <div className="bg-white text-black rounded-lg p-1.5 sm:p-2 shrink-0">
                 {getManeuverIcon(currentStep?.maneuver?.type)}
               </div>
-              <div className="flex-1">
-                <p className="text-lg font-semibold">{getInstructionText()}</p>
-                {currentStep?.name && <p className="text-sm opacity-90">on {currentStep.name}</p>}
+              <div className="flex-1 min-w-0">
+                <p className="text-base sm:text-lg font-semibold leading-tight">{getInstructionText()}</p>
+                {currentStep?.name && <p className="text-xs sm:text-sm opacity-90 truncate mt-0.5">on {currentStep.name}</p>}
               </div>
             </div>
 
             {/* Next instruction preview */}
             {nextStep && (
-              <div className="mt-3 pt-3 border-t border-white/20 flex items-center gap-2 text-xs opacity-80">
-                {getManeuverIcon(nextStep.maneuver?.type)}
-                <span>Then: {getNextStepText()}</span>
+              <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-white/20 flex items-center gap-2 text-xs opacity-80">
+                <div className="shrink-0 scale-75 origin-left">
+                  {getManeuverIcon(nextStep.maneuver?.type)}
+                </div>
+                <span className="truncate">Then: {getNextStepText()}</span>
               </div>
             )}
           </div>
@@ -276,13 +278,13 @@ export default function NavigationMode({
           initial={{ y: 100 }}
           animate={{ y: 0 }}
           exit={{ y: 100 }}
-          className="fixed bottom-0 mx-2 rounded-t-2xl left-0 right-0 z-40 bg-background border-t border-border shadow-2xl"
+          className="fixed bottom-0 mx-0 sm:mx-2 rounded-t-2xl left-0 right-0 z-40 bg-background border-t border-border shadow-2xl"
         >
-          <div className="p-4 pb-8">
+          <div className="p-3 sm:p-4 pb-6 sm:pb-8">
             {/* Progress indicator */}
             {totalDistance && totalDistance > 0 && (
               <div className="mb-3 flex items-center gap-2">
-                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                <div className="flex-1 h-1.5 sm:h-2 bg-muted rounded-full overflow-hidden">
                   <motion.div
                     className="h-full bg-gradient-to-r from-primary to-emerald-400 rounded-full"
                     initial={{ width: 0 }}
@@ -290,38 +292,38 @@ export default function NavigationMode({
                     transition={{ duration: 0.5, ease: 'easeOut' }}
                   />
                 </div>
-                <span className="text-xs font-medium text-muted-foreground w-12 text-right">
+                <span className="text-[10px] sm:text-xs font-medium text-muted-foreground w-8 sm:w-12 text-right">
                   {Math.round(progress)}%
                 </span>
               </div>
             )}
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               {/* Stats on the left */}
-              <div className="flex-1">
-                <div className="text-3xl font-bold text-primary">
+              <div className="flex-1 min-w-0">
+                <div className="text-2xl sm:text-3xl font-bold text-primary leading-none">
                   {formatDuration(routeDuration)}
                 </div>
-                <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-                  <span>{formatDistance(routeDistance)}</span>
-                  <span>•</span>
-                  <span>ETA {getETA()}</span>
+                <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-1 mt-1 text-xs sm:text-sm text-muted-foreground">
+                  <span className="whitespace-nowrap">{formatDistance(routeDistance)}</span>
+                  <span className="hidden sm:inline">•</span>
+                  <span className="whitespace-nowrap">ETA {getETA()}</span>
                 </div>
               </div>
 
               {/* Speed display */}
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col items-center bg-muted/50 rounded-xl px-4 py-2">
-                  <div className="flex items-center gap-1.5">
-                    <Gauge className="h-4 w-4 text-primary" />
-                    <span className="text-2xl font-bold text-foreground">{formatSpeed(displaySpeed)}</span>
-                    <span className="text-xs text-muted-foreground">km/h</span>
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                <div className="flex flex-col items-center bg-muted/50 rounded-lg sm:rounded-xl px-2 sm:px-4 py-1.5 sm:py-2 min-w-[60px] sm:min-w-[80px]">
+                  <div className="flex items-center gap-1">
+                    <Gauge className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+                    <span className="text-lg sm:text-2xl font-bold text-foreground">{formatSpeed(displaySpeed)}</span>
+                    <span className="text-[10px] sm:text-xs text-muted-foreground">km/h</span>
                   </div>
-                  <span className="text-xs text-muted-foreground">{getSpeedStatus(displaySpeed)}</span>
+                  <span className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">{getSpeedStatus(displaySpeed)}</span>
                 </div>
 
                 {/* Exit button */}
-                <Button onClick={onExit} size={'lg'} variant="destructive" className="rounded-full">
+                <Button onClick={onExit} size={'default'} variant="destructive" className="rounded-full h-10 sm:h-12 px-4 sm:px-6 text-sm sm:text-base">
                   Exit
                 </Button>
               </div>
@@ -334,32 +336,32 @@ export default function NavigationMode({
       <motion.div
         initial={{ y: 100 }}
         animate={{ y: 0 }}
-        className="fixed bottom-32 left-0 right-0 px-2 z-40"
+        className="fixed bottom-28 sm:bottom-32 left-0 right-0 px-2 sm:px-4 z-40"
       >
         <div className="max-w-lg mx-auto flex gap-2">
           {/* Recenter Button */}
           {showRecenter ? (
             <Button
               onClick={onRecenter}
-              className="flex-1 backdrop-blur-2xl h-12"
+              className="flex-1 backdrop-blur-2xl h-10 sm:h-12"
               variant="outline"
               size={'sm'}
             >
-              <Compass className="h-5 w-5 mr-1" />
-              <span className="font-medium">Re-center</span>
+              <Compass className="h-4 w-4 sm:h-5 sm:w-5 mr-1" />
+              <span className="font-medium text-xs sm:text-sm">Re-center</span>
             </Button>
           ) : (
             <div className="flex-1" />
           )}
 
           {/* SOS Button */}
-          <SOSButton onClick={onSOS} variant="compact" className="flex-1 backdrop-blur-2xl" />
+          <SOSButton onClick={onSOS} variant="compact" className="flex-1 backdrop-blur-2xl h-10 sm:h-12" />
 
           {/* Report Button */}
           {onReport && (
-            <Button onClick={onReport} variant="outline" className="flex-1 backdrop-blur-2xl h-12">
-              <AlertTriangle className="h-5 w-5 mr-1" />
-              <span>Report</span>
+            <Button onClick={onReport} variant="outline" className="flex-1 backdrop-blur-2xl h-10 sm:h-12">
+              <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 mr-1" />
+              <span className="text-xs sm:text-sm">Report</span>
             </Button>
           )}
         </div>

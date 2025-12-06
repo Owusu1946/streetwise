@@ -68,8 +68,8 @@ export default function RouteSelection({
                 <Card
                   key={index}
                   className={`p-3 sm:p-4 cursor-pointer transition-all ${isSelected
-                      ? 'bg-primary/10 border-primary shadow-lg'
-                      : 'bg-card border-border hover:bg-accent'
+                    ? 'bg-primary/10 border-primary shadow-lg'
+                    : 'bg-card border-border hover:bg-accent'
                     }`}
                   onClick={() => onSelectRoute(index)}
                 >
@@ -93,12 +93,12 @@ export default function RouteSelection({
                           route.lightingPercentage >= 80 && (
                             <span
                               className={`text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap ${route.lightingPercentage >= 90
-                                  ? 'bg-yellow-500/20 text-yellow-600'
-                                  : route.lightingPercentage >= 70
-                                    ? 'bg-orange-500/20 text-orange-600'
-                                    : route.lightingPercentage >= 50
-                                      ? 'bg-orange-600/20 text-orange-700'
-                                      : 'bg-red-500/20 text-red-600'
+                                ? 'bg-yellow-500/20 text-yellow-600'
+                                : route.lightingPercentage >= 70
+                                  ? 'bg-orange-500/20 text-orange-600'
+                                  : route.lightingPercentage >= 50
+                                    ? 'bg-orange-600/20 text-orange-700'
+                                    : 'bg-red-500/20 text-red-600'
                                 }`}
                             >
                               {route.lightingPercentage === 100
@@ -108,7 +108,7 @@ export default function RouteSelection({
                           )}
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-muted-foreground">
+                      <div className="grid grid-cols-2 gap-y-1 gap-x-4 sm:flex sm:flex-wrap sm:gap-x-3 text-xs sm:text-sm text-muted-foreground mt-2 sm:mt-0">
                         <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3 shrink-0" />
                           <span>{formatDuration(route.duration)}</span>
