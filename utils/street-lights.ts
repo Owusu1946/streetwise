@@ -34,16 +34,20 @@ export async function getStreetLightsNearRoute(
         buffer_meters: bufferDistance,
       })
       .single()) as {
-      data: {
-        total_lights: number
-        lights_24h: number
-        lights_night_only: number
-      } | null
-      error: any
-    }
+        data: {
+          total_lights: number
+          lights_24h: number
+          lights_night_only: number
+        } | null
+        error: any
+      }
 
     if (error || !data) {
-      console.error('Error fetching street lights:', error)
+      // Only log if it's not the known "function doesn't exist" error
+      if (error?.code !== 'PGRST202') {
+        console.error('Error fetching street lights:', error)
+      }
+      // Return default values - street lights feature not available
       return {
         data: {
           totalLights: 0,
@@ -51,7 +55,7 @@ export async function getStreetLightsNearRoute(
           lightsNightOnly: 0,
           coveragePercentage: 0,
         },
-        error,
+        error: null, // Don't propagate error for missing function
       }
     }
 

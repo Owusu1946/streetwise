@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   CornerUpLeftIcon,
@@ -11,6 +11,7 @@ import {
   Flag,
   Compass,
   AlertTriangle,
+  Gauge,
 } from 'lucide-react'
 import { NavigationStep } from '@/types/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -21,6 +22,8 @@ interface NavigationModeProps {
   nextStep: NavigationStep | null
   routeDuration: number // seconds remaining
   routeDistance: number // meters remaining
+  totalDistance?: number // total route distance in meters
+  currentSpeed?: number // speed in m/s from GPS
   onExit: () => void
   onRecenter: () => void
   onReport?: () => void
@@ -33,6 +36,8 @@ export default function NavigationMode({
   nextStep,
   routeDuration,
   routeDistance,
+  totalDistance,
+  currentSpeed,
   onExit,
   onRecenter,
   onReport,
@@ -40,15 +45,80 @@ export default function NavigationMode({
   showRecenter,
 }: NavigationModeProps) {
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [displaySpeed, setDisplaySpeed] = useState(0)
+  const lastPositionRef = useRef<{ lat: number; lng: number; time: number } | null>(null)
+  const [calculatedSpeed, setCalculatedSpeed] = useState(0)
 
   // Update time every minute for ETA
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date())
-    }, 60000) // Update every minute
+    }, 60000)
 
     return () => clearInterval(timer)
   }, [])
+
+  // Calculate speed from GPS if not provided
+  useEffect(() => {
+    if (currentSpeed !== undefined) {
+      // Smooth the speed display
+      setDisplaySpeed(prev => {
+        const diff = currentSpeed - prev
+        return prev + diff * 0.3 // Smooth transition
+      })
+    } else if (calculatedSpeed > 0) {
+      setDisplaySpeed(calculatedSpeed)
+    }
+  }, [currentSpeed, calculatedSpeed])
+
+  // Watch position for speed calculation if currentSpeed is not provided
+  useEffect(() => {
+    if (currentSpeed !== undefined) return // Skip if speed is provided
+
+    let watchId: number | null = null
+
+    if (navigator.geolocation) {
+      watchId = navigator.geolocation.watchPosition(
+        (position) => {
+          const now = Date.now()
+          const { latitude, longitude } = position.coords
+
+          if (position.coords.speed !== null && position.coords.speed >= 0) {
+            setCalculatedSpeed(position.coords.speed)
+          } else if (lastPositionRef.current) {
+            // Calculate speed from distance/time
+            const timeDiff = (now - lastPositionRef.current.time) / 1000
+            if (timeDiff > 0.5) {
+              const R = 6371e3
+              const φ1 = (lastPositionRef.current.lat * Math.PI) / 180
+              const φ2 = (latitude * Math.PI) / 180
+              const Δφ = ((latitude - lastPositionRef.current.lat) * Math.PI) / 180
+              const Δλ = ((longitude - lastPositionRef.current.lng) * Math.PI) / 180
+
+              const a = Math.sin(Δφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) ** 2
+              const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+              const distance = R * c
+
+              const speed = distance / timeDiff
+              if (speed < 50) { // Filter out GPS jumps (max ~180 km/h)
+                setCalculatedSpeed(speed)
+              }
+            }
+          }
+
+          lastPositionRef.current = { lat: latitude, lng: longitude, time: now }
+        },
+        () => { },
+        { enableHighAccuracy: true, maximumAge: 1000 }
+      )
+    }
+
+    return () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId)
+      }
+    }
+  }, [currentSpeed])
 
   const formatDuration = (seconds: number) => {
     const mins = Math.ceil(seconds / 60)
@@ -63,6 +133,29 @@ export default function NavigationMode({
       return `${Math.round(meters)} m`
     }
     return `${(meters / 1000).toFixed(1)} km`
+  }
+
+  // Format speed in km/h
+  const formatSpeed = (metersPerSecond: number) => {
+    const kmh = metersPerSecond * 3.6
+    return `${Math.round(kmh)}`
+  }
+
+  // Get walking/moving status based on speed
+  const getSpeedStatus = (metersPerSecond: number) => {
+    const kmh = metersPerSecond * 3.6
+    if (kmh < 1) return 'Stopped'
+    if (kmh < 6) return 'Walking'
+    if (kmh < 15) return 'Jogging'
+    if (kmh < 30) return 'Cycling'
+    return 'Driving'
+  }
+
+  // Calculate progress percentage
+  const getProgress = () => {
+    if (!totalDistance || totalDistance === 0) return 0
+    const traveled = totalDistance - routeDistance
+    return Math.min(100, Math.max(0, (traveled / totalDistance) * 100))
   }
 
   const getETA = () => {
@@ -96,10 +189,22 @@ export default function NavigationMode({
     }
   }
 
+  // Strip HTML tags from Google Directions API instructions
+  const stripHtml = (html: string): string => {
+    if (!html) return ''
+    return html
+      .replace(/<\/?b>/gi, '')
+      .replace(/<\/?[^>]+(>|$)/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
   const getInstructionText = () => {
     if (!currentStep) return 'Continue straight'
 
-    const instruction = currentStep.maneuver?.instruction || currentStep.instruction || 'Continue'
+    const rawInstruction = currentStep.maneuver?.instruction || currentStep.instruction || 'Continue'
+    const instruction = stripHtml(rawInstruction)
     const distance = currentStep.distance
 
     if (distance < 50) {
@@ -113,6 +218,14 @@ export default function NavigationMode({
     }
   }
 
+  const getNextStepText = () => {
+    if (!nextStep) return ''
+    const rawInstruction = nextStep.maneuver?.instruction || nextStep.instruction || ''
+    return stripHtml(rawInstruction)
+  }
+
+  const progress = getProgress()
+
   return (
     <>
       {/* Top instruction bar */}
@@ -121,8 +234,20 @@ export default function NavigationMode({
           initial={{ y: -100 }}
           animate={{ y: 0 }}
           exit={{ y: -100 }}
-          className="fixed top-0 m-4 rounded-2xl left-0 right-0 z-40 bg-background text-background-foreground shadow-lg"
+          className="fixed top-0 m-4 rounded-2xl left-0 right-0 z-40 bg-background text-background-foreground shadow-lg overflow-hidden"
         >
+          {/* Progress bar at top */}
+          {totalDistance && totalDistance > 0 && (
+            <div className="h-1 bg-muted w-full">
+              <motion.div
+                className="h-full bg-gradient-to-r from-primary via-primary to-emerald-400"
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                transition={{ duration: 0.5, ease: 'easeOut' }}
+              />
+            </div>
+          )}
+
           <div className="p-4">
             <div className="flex items-center gap-4">
               <div className="bg-white text-black rounded-lg p-2">
@@ -138,7 +263,7 @@ export default function NavigationMode({
             {nextStep && (
               <div className="mt-3 pt-3 border-t border-white/20 flex items-center gap-2 text-xs opacity-80">
                 {getManeuverIcon(nextStep.maneuver?.type)}
-                <span>Then: {nextStep.maneuver?.instruction || nextStep.instruction}</span>
+                <span>Then: {getNextStepText()}</span>
               </div>
             )}
           </div>
@@ -154,6 +279,23 @@ export default function NavigationMode({
           className="fixed bottom-0 mx-2 rounded-t-2xl left-0 right-0 z-40 bg-background border-t border-border shadow-2xl"
         >
           <div className="p-4 pb-8">
+            {/* Progress indicator */}
+            {totalDistance && totalDistance > 0 && (
+              <div className="mb-3 flex items-center gap-2">
+                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-gradient-to-r from-primary to-emerald-400 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progress}%` }}
+                    transition={{ duration: 0.5, ease: 'easeOut' }}
+                  />
+                </div>
+                <span className="text-xs font-medium text-muted-foreground w-12 text-right">
+                  {Math.round(progress)}%
+                </span>
+              </div>
+            )}
+
             <div className="flex items-center justify-between">
               {/* Stats on the left */}
               <div className="flex-1">
@@ -167,8 +309,18 @@ export default function NavigationMode({
                 </div>
               </div>
 
-              {/* Exit button on the right */}
-              <div className="flex items-center gap-2">
+              {/* Speed display */}
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col items-center bg-muted/50 rounded-xl px-4 py-2">
+                  <div className="flex items-center gap-1.5">
+                    <Gauge className="h-4 w-4 text-primary" />
+                    <span className="text-2xl font-bold text-foreground">{formatSpeed(displaySpeed)}</span>
+                    <span className="text-xs text-muted-foreground">km/h</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{getSpeedStatus(displaySpeed)}</span>
+                </div>
+
+                {/* Exit button */}
                 <Button onClick={onExit} size={'lg'} variant="destructive" className="rounded-full">
                   Exit
                 </Button>
@@ -182,7 +334,7 @@ export default function NavigationMode({
       <motion.div
         initial={{ y: 100 }}
         animate={{ y: 0 }}
-        className="fixed bottom-28 left-0 right-0 px-2 z-40"
+        className="fixed bottom-32 left-0 right-0 px-2 z-40"
       >
         <div className="max-w-lg mx-auto flex gap-2">
           {/* Recenter Button */}

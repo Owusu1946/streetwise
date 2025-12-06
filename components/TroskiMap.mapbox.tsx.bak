@@ -3,7 +3,7 @@
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Bus, ChevronLeft, MapPin, Navigation, Plus, Search, X, AlertTriangle, Footprints, Car, Layers } from 'lucide-react'
-import { GoogleMap, useJsApiLoader } from '@react-google-maps/api'
+import mapboxgl from 'mapbox-gl'
 import { useTheme } from 'next-themes'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { TroskiSearchDrawer } from './TroskiSearchDrawer'
@@ -11,27 +11,10 @@ import { TroskiContributeDrawer } from './TroskiContributeDrawer'
 import { TroskiJourneyView } from './TroskiJourneyView'
 import type { TroskiRoute, TroskiRouteStop, JourneyResult } from '@/utils/troski'
 import { motion, AnimatePresence } from 'framer-motion'
-import {
-    DARK_MAP_STYLE,
-    LIGHT_MAP_STYLE,
-    GOOGLE_MAPS_LIBRARIES,
-    getMapTypeId,
-    type MapViewMode,
-} from '@/utils/googlemaps'
 
 interface TroskiMapProps {
     className?: string
     onExitTroskiMode: () => void
-}
-
-const containerStyle = {
-    width: '100%',
-    height: '100%',
-}
-
-const defaultCenter = {
-    lat: 5.6037,
-    lng: -0.1870,
 }
 
 // Calculate distance between two coordinates in meters using Haversine formula
@@ -55,12 +38,10 @@ function formatDistance(meters: number): string {
 }
 
 export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) {
-    const [map, setMap] = useState<google.maps.Map | null>(null)
-    const markersRef = useRef<google.maps.Marker[]>([])
-    const userMarkerRef = useRef<google.maps.Marker | null>(null)
-    const journeyMarkersRef = useRef<google.maps.Marker[]>([])
-    const journeyPolylinesRef = useRef<google.maps.Polyline[]>([])
-    const directionsServiceRef = useRef<google.maps.DirectionsService | null>(null)
+    const mapContainer = useRef<HTMLDivElement>(null)
+    const map = useRef<mapboxgl.Map | null>(null)
+    const markersRef = useRef<mapboxgl.Marker[]>([])
+    const userMarkerRef = useRef<mapboxgl.Marker | null>(null)
     const watchIdRef = useRef<number | null>(null)
     const [lng, setLng] = useState<number>(-0.187)
     const [lat, setLat] = useState<number>(5.6037)
@@ -74,7 +55,7 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
     const [isTracking, setIsTracking] = useState(false)
 
     // Map View Mode state
-    const [mapViewMode, setMapViewMode] = useState<MapViewMode>('standard')
+    const [mapViewMode, setMapViewMode] = useState<'standard' | 'satellite'>('standard')
 
     // UI states
     const [searchOpen, setSearchOpen] = useState(false)
@@ -90,52 +71,45 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
         journey: JourneyResult | null
     }>({ show: false, distance: 0, originName: '', journey: null })
 
-    // Load Google Maps API
-    const { isLoaded, loadError } = useJsApiLoader({
-        id: 'google-map-script',
-        googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || '',
-        libraries: GOOGLE_MAPS_LIBRARIES,
-    })
+    // Create user location marker element
+    const createUserLocationMarker = useCallback(() => {
+        const el = document.createElement('div')
+        el.className = 'user-location-marker'
+        el.innerHTML = `
+            <div class="relative">
+                <div class="w-5 h-5 bg-blue-500 rounded-full border-3 border-white shadow-lg z-10 relative"></div>
+                <div class="absolute inset-0 bg-blue-400 rounded-full animate-ping opacity-75"></div>
+                <div class="absolute -inset-3 bg-blue-300/30 rounded-full"></div>
+            </div>
+        `
+        return el
+    }, [])
 
     // Update user marker position
     const updateUserMarker = useCallback((location: [number, number]) => {
-        if (!map) return
-
-        const position = { lat: location[1], lng: location[0] }
+        if (!map.current) return
 
         if (!userMarkerRef.current) {
-            userMarkerRef.current = new google.maps.Marker({
-                map,
-                position,
-                icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 10,
-                    fillColor: '#3b82f6',
-                    fillOpacity: 1,
-                    strokeColor: '#ffffff',
-                    strokeWeight: 3,
-                },
-                zIndex: 1000,
+            // Create new marker
+            userMarkerRef.current = new mapboxgl.Marker({
+                element: createUserLocationMarker(),
+                anchor: 'center'
             })
+                .setLngLat(location)
+                .addTo(map.current)
         } else {
-            userMarkerRef.current.setPosition(position)
+            // Update existing marker position with smooth animation
+            userMarkerRef.current.setLngLat(location)
         }
-    }, [map])
+    }, [createUserLocationMarker])
 
-    // Start watching user location (continuous tracking)
+    // Start watching user location
     const startLocationTracking = useCallback(() => {
         if (!navigator.geolocation) {
             console.error('Geolocation is not supported')
             return
         }
 
-        // Avoid starting multiple watchers
-        if (watchIdRef.current !== null) {
-            console.log('Location tracking already active')
-            return
-        }
-
-        console.log('Starting Troski location tracking...')
         setIsTracking(true)
 
         watchIdRef.current = navigator.geolocation.watchPosition(
@@ -145,13 +119,12 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
                 updateUserMarker(loc)
             },
             (error) => {
-                console.error('Geolocation tracking error:', error)
-                // Don't stop tracking on error, geolocation might recover
+                console.error('Geolocation error:', error)
             },
             {
                 enableHighAccuracy: true,
-                timeout: 15000,
-                maximumAge: 1000 // Allow cached position up to 1 second for smoother updates
+                timeout: 10000,
+                maximumAge: 1000 // Update every second max
             }
         )
     }, [updateUserMarker])
@@ -179,9 +152,12 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
                     setUserLocation(loc)
                     updateUserMarker(loc)
 
-                    if (map) {
-                        map.panTo({ lat: loc[1], lng: loc[0] })
-                        map.setZoom(15)
+                    if (map.current) {
+                        map.current.flyTo({
+                            center: loc,
+                            zoom: 15,
+                            duration: 1500,
+                        })
                     }
 
                     resolve(loc)
@@ -193,125 +169,129 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
                 { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
             )
         })
-    }, [map, updateUserMarker])
+    }, [updateUserMarker])
 
     // Center map on user location
     const centerOnUser = useCallback(() => {
-        if (userLocation && map) {
-            map.panTo({ lat: userLocation[1], lng: userLocation[0] })
-            map.setZoom(16)
+        if (userLocation && map.current) {
+            map.current.flyTo({
+                center: userLocation,
+                zoom: 16,
+                duration: 1000,
+            })
         }
-    }, [userLocation, map])
+    }, [userLocation])
 
-    // Handle map load
-    const onLoad = useCallback((mapInstance: google.maps.Map) => {
-        setMap(mapInstance)
-        setMapLoaded(true)
-        directionsServiceRef.current = new google.maps.DirectionsService()
-        console.log('TroskiMap loaded successfully!')
-    }, [])
-
-    // Handle map unmount
-    const onUnmount = useCallback(() => {
-        stopLocationTracking()
-        setMap(null)
-        setMapLoaded(false)
-    }, [stopLocationTracking])
-
-    // Initialize location and load stops when map is ready
+    // Initialize map
     useEffect(() => {
-        if (mapLoaded && map) {
-            // Start continuous tracking immediately
-            startLocationTracking()
+        if (!mapContainer.current || map.current) return
 
-            // Also try to get initial location and pan to it
-            getUserLocation()
-                .catch((error) => {
-                    console.log('Could not get initial user location:', error)
-                })
+        const mapStyle =
+            resolvedTheme === 'dark'
+                ? 'mapbox://styles/mapbox/dark-v11'
+                : 'mapbox://styles/mapbox/light-v11'
 
-            loadTroskiStops()
+        try {
+            map.current = new mapboxgl.Map({
+                container: mapContainer.current,
+                style: mapStyle,
+                center: [lng, lat],
+                zoom: zoom,
+                attributionControl: false,
+            })
+        } catch (error) {
+            console.error('Error initializing map:', error)
+            setMapError(error instanceof Error ? error.message : 'Failed to initialize map')
+            return
         }
 
-        // Cleanup on unmount
+        map.current.on('move', () => {
+            if (!map.current) return
+            setLng(parseFloat(map.current.getCenter().lng.toFixed(4)))
+            setLat(parseFloat(map.current.getCenter().lat.toFixed(4)))
+            setZoom(parseFloat(map.current.getZoom().toFixed(2)))
+        })
+
+        map.current.on('load', async () => {
+            if (!map.current) return
+            setMapLoaded(true)
+
+            try {
+                await getUserLocation()
+                // Start continuous tracking
+                startLocationTracking()
+            } catch (error) {
+                console.log('Could not get user location:', error)
+            }
+
+            // Load troski stops
+            await loadTroskiStops()
+        })
+
         return () => {
             stopLocationTracking()
+            map.current?.remove()
+            map.current = null
         }
-    }, [mapLoaded, map, getUserLocation, startLocationTracking, stopLocationTracking])
+    }, [getUserLocation, startLocationTracking, stopLocationTracking])
 
     // Update map style when theme or view mode changes
     useEffect(() => {
-        if (!map || !mapLoaded) return
+        if (!map.current || !mapLoaded) return
 
-        map.setMapTypeId(getMapTypeId(mapViewMode))
-
-        if (mapViewMode === 'standard') {
-            map.setOptions({
-                styles: resolvedTheme === 'dark' ? DARK_MAP_STYLE : LIGHT_MAP_STYLE,
-            })
+        let mapStyle = ''
+        if (mapViewMode === 'satellite') {
+            mapStyle = 'mapbox://styles/mapbox/satellite-streets-v12'
         } else {
-            map.setOptions({ styles: [] })
+            mapStyle =
+                resolvedTheme === 'dark'
+                    ? 'mapbox://styles/mapbox/dark-v11'
+                    : 'mapbox://styles/mapbox/light-v11'
         }
-    }, [resolvedTheme, mapLoaded, mapViewMode, map])
 
-    // Handle map center changes
-    const handleCenterChanged = useCallback(() => {
-        if (!map) return
-        const center = map.getCenter()
-        if (center) {
-            setLng(parseFloat(center.lng().toFixed(4)))
-            setLat(parseFloat(center.lat().toFixed(4)))
-        }
-    }, [map])
-
-    const handleZoomChanged = useCallback(() => {
-        if (!map) return
-        setZoom(map.getZoom() || 12)
-    }, [map])
+        map.current.setStyle(mapStyle)
+    }, [resolvedTheme, mapLoaded, mapViewMode])
 
     // Load troski stops and display on map
     const loadTroskiStops = async () => {
-        if (!map) return
-
         try {
             const response = await fetch('/api/troski/stops')
             const data = await response.json()
 
-            if (data.stops) {
+            if (data.stops && map.current) {
                 // Clear existing markers
-                markersRef.current.forEach((marker) => marker.setMap(null))
+                markersRef.current.forEach((marker) => marker.remove())
                 markersRef.current = []
 
                 // Add markers for each stop
                 data.stops.forEach((stop: { id: string; name: string; latitude: number; longitude: number }) => {
-                    const marker = new google.maps.Marker({
-                        position: { lat: stop.latitude, lng: stop.longitude },
-                        map,
-                        icon: {
-                            url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-                                    <circle cx="16" cy="16" r="14" fill="#10b981" stroke="white" stroke-width="2"/>
-                                    <text x="16" y="20" font-size="14" text-anchor="middle" fill="white">🚌</text>
-                                </svg>
-                            `),
-                            scaledSize: new google.maps.Size(32, 32),
-                            anchor: new google.maps.Point(16, 16),
-                        },
-                        title: stop.name,
-                    })
+                    const el = document.createElement('div')
+                    el.className = 'troski-stop-marker'
+                    el.innerHTML = `
+            <div class="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white cursor-pointer hover:scale-110 transition-transform">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 6v6"></path>
+                <path d="M15 6v6"></path>
+                <path d="M2 12h19.6"></path>
+                <path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3"></path>
+                <circle cx="7" cy="18" r="2"></circle>
+                <path d="M9 18h5"></path>
+                <circle cx="16" cy="18" r="2"></circle>
+              </svg>
+            </div>
+          `
 
-                    const infoWindow = new google.maps.InfoWindow({
-                        content: `
-                            <div style="padding: 8px;">
-                                <h3 style="font-weight: 600; font-size: 14px; margin: 0 0 4px 0;">${stop.name}</h3>
-                                <p style="font-size: 12px; color: #666; margin: 0;">Troski Stop</p>
-                            </div>
-                        `,
-                    })
-
-                    marker.addListener('click', () => {
-                        infoWindow.open(map, marker)
-                    })
+                    const marker = new mapboxgl.Marker({ element: el })
+                        .setLngLat([stop.longitude, stop.latitude])
+                        .setPopup(
+                            new mapboxgl.Popup({ offset: 25 }).setHTML(`
+                <div class="p-2">
+                  <h3 class="font-semibold text-sm">${stop.name}</h3>
+                  <p class="text-xs text-gray-500">Troski Stop</p>
+                </div>
+              `)
+                        )
+                        .addTo(map.current!)
 
                     markersRef.current.push(marker)
                 })
@@ -321,15 +301,15 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
         }
     }
 
-    // Find the best boarding point on a journey
+    // Find the best boarding point on a journey (closest stop or origin to user)
     interface BoardingPoint {
         type: 'origin' | 'stop'
         name: string
         lat: number
         lng: number
         distance: number
-        stopIndex?: number
-        fareSaved?: number
+        stopIndex?: number // If it's a stop, which index in the stops array
+        fareSaved?: number // Estimated fare saved by boarding here
     }
 
     const findBestBoardingPoint = (journey: JourneyResult): BoardingPoint | null => {
@@ -360,6 +340,7 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
                 stop.stop_longitude
             )
 
+            // Calculate estimated fare saved (sum of fares before this stop)
             let fareSaved = 0
             for (let i = 0; i <= index; i++) {
                 if (journey.stops[i].fare_from_previous) {
@@ -378,6 +359,7 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
             })
         })
 
+        // Sort by distance and return the closest one
         points.sort((a, b) => a.distance - b.distance)
         return points[0]
     }
@@ -387,15 +369,18 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
         setSearchOpen(false)
 
         if (!userLocation) {
+            // No location, just proceed normally
             proceedWithJourney(journey, null)
             return
         }
 
+        // Show "Finding best route" toast
         const { toast } = await import('sonner')
         const toastId = toast.loading('Finding best route...', {
             description: 'Checking nearby boarding points'
         })
 
+        // Find the best boarding point
         const bestPoint = findBestBoardingPoint(journey)
 
         if (!bestPoint) {
@@ -404,16 +389,19 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
             return
         }
 
+        // If within 500m of ANY point, board there
         if (bestPoint.distance <= 500) {
             toast.dismiss(toastId)
 
             if (bestPoint.type === 'origin') {
+                // User is close to origin, proceed normally
                 toast.success('You\'re near the start!', {
                     description: `Board at ${bestPoint.name}`,
                     duration: 3000
                 })
                 proceedWithJourney(journey, bestPoint)
             } else {
+                // User is close to a stop along the route - board there instead!
                 const savingsMsg = bestPoint.fareSaved && bestPoint.fareSaved > 0
                     ? `Save GH₵${bestPoint.fareSaved} by boarding here`
                     : 'Board closer to you'
@@ -425,7 +413,10 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
                 proceedWithJourney(journey, bestPoint)
             }
         } else {
+            // User is far from all points - show the closest option
             toast.dismiss(toastId)
+
+            // Show warning about distance
             setDistanceWarning({
                 show: true,
                 distance: bestPoint.distance,
@@ -435,14 +426,17 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
         }
     }
 
-    // Proceed with journey
+    // Proceed with journey, optionally starting from a different point
     const proceedWithJourney = (journey: JourneyResult, boardingPoint: BoardingPoint | null) => {
         setDistanceWarning({ show: false, distance: 0, originName: '', journey: null })
 
+        // Create adjusted journey if boarding at a stop instead of origin
         let adjustedJourney = journey
         if (boardingPoint && boardingPoint.type === 'stop' && boardingPoint.stopIndex !== undefined) {
+            // Filter out stops before the boarding point
             const remainingStops = journey.stops.slice(boardingPoint.stopIndex + 1)
 
+            // Create new route with adjusted origin
             adjustedJourney = {
                 ...journey,
                 route: {
@@ -450,54 +444,85 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
                     origin_name: boardingPoint.name,
                     origin_latitude: boardingPoint.lat,
                     origin_longitude: boardingPoint.lng,
+                    // Adjust fare if we know how much was saved
                     total_fare: journey.route.total_fare
                         ? Math.max(0, Number(journey.route.total_fare) - (boardingPoint.fareSaved || 0))
                         : undefined
                 },
                 stops: remainingStops,
-            } as JourneyResult
+                // Store original journey for reference
+                originalJourney: journey
+            } as JourneyResult & { originalJourney?: JourneyResult }
         }
 
         setSelectedJourney(adjustedJourney)
 
-        if (map && adjustedJourney.route) {
-            const bounds = new google.maps.LatLngBounds()
+        if (map.current && adjustedJourney.route) {
+            // Fit map to show user location and the journey
+            const bounds = new mapboxgl.LngLatBounds()
 
+            // Include user location
             if (userLocation) {
-                bounds.extend({ lat: userLocation[1], lng: userLocation[0] })
+                bounds.extend(userLocation)
             }
 
-            bounds.extend({ lat: adjustedJourney.route.origin_latitude, lng: adjustedJourney.route.origin_longitude })
-            bounds.extend({ lat: adjustedJourney.route.destination_latitude, lng: adjustedJourney.route.destination_longitude })
+            bounds.extend([adjustedJourney.route.origin_longitude, adjustedJourney.route.origin_latitude])
+            bounds.extend([adjustedJourney.route.destination_longitude, adjustedJourney.route.destination_latitude])
 
             adjustedJourney.stops.forEach((stop) => {
-                bounds.extend({ lat: stop.stop_latitude, lng: stop.stop_longitude })
+                bounds.extend([stop.stop_longitude, stop.stop_latitude])
             })
 
-            map.fitBounds(bounds, { top: 80, bottom: 300, left: 80, right: 80 })
+            map.current.fitBounds(bounds, { padding: 80, duration: 1000 })
 
+            // Draw the journey on the map
             drawJourneyOnMap(adjustedJourney)
         }
     }
 
-    // Draw journey route on map using Google Directions API
+    // Cancel distance warning
+    const cancelDistanceWarning = () => {
+        setDistanceWarning({ show: false, distance: 0, originName: '', journey: null })
+    }
+
+    // Close the journey view but KEEP the route visible on the map
+    const closeJourneyView = () => {
+        setSelectedJourney(null)
+    }
+
+    // Draw journey route on map using Mapbox Directions API for real roads
     const drawJourneyOnMap = async (journey: JourneyResult) => {
-        if (!map || !directionsServiceRef.current) return
+        if (!map.current) return
 
-        // Clear existing journey elements
-        journeyPolylinesRef.current.forEach((polyline) => polyline.setMap(null))
-        journeyPolylinesRef.current = []
-        journeyMarkersRef.current.forEach((marker) => marker.setMap(null))
-        journeyMarkersRef.current = []
+        // Remove existing journey layers
+        if (map.current.getLayer('journey-line')) {
+            map.current.removeLayer('journey-line')
+        }
+        if (map.current.getLayer('journey-line-casing')) {
+            map.current.removeLayer('journey-line-casing')
+        }
+        if (map.current.getLayer('walk-to-start-line')) {
+            map.current.removeLayer('walk-to-start-line')
+        }
+        if (map.current.getSource('journey-route')) {
+            map.current.removeSource('journey-route')
+        }
+        if (map.current.getSource('walk-to-start')) {
+            map.current.removeSource('walk-to-start')
+        }
 
-        // Build waypoints
-        const waypoints = journey.stops.map((stop) => ({
-            location: { lat: stop.stop_latitude, lng: stop.stop_longitude },
-            stopover: true,
-        }))
+        // Remove existing journey markers
+        document.querySelectorAll('.journey-stop-marker').forEach(el => el.remove())
+
+        // Build waypoints array for Mapbox Directions API
+        const waypoints: [number, number][] = [
+            [journey.route.origin_longitude, journey.route.origin_latitude],
+            ...journey.stops.map((stop) => [stop.stop_longitude, stop.stop_latitude] as [number, number]),
+            [journey.route.destination_longitude, journey.route.destination_latitude],
+        ]
 
         try {
-            // Draw walking route to origin if user is not there
+            // If user is not at origin, draw walking route to origin first
             if (userLocation) {
                 const distanceToOrigin = calculateDistance(
                     userLocation[1],
@@ -506,211 +531,240 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
                     journey.route.origin_longitude
                 )
 
-                if (distanceToOrigin > 50) {
-                    const walkRequest: google.maps.DirectionsRequest = {
-                        origin: { lat: userLocation[1], lng: userLocation[0] },
-                        destination: { lat: journey.route.origin_latitude, lng: journey.route.origin_longitude },
-                        travelMode: google.maps.TravelMode.WALKING,
+                if (distanceToOrigin > 50) { // More than 50m away
+                    // Fetch walking route to start point
+                    const walkUrl = `https://api.mapbox.com/directions/v5/mapbox/walking/${userLocation[0]},${userLocation[1]};${journey.route.origin_longitude},${journey.route.origin_latitude}?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}&geometries=geojson&overview=full`
+
+                    const walkResponse = await fetch(walkUrl)
+                    const walkData = await walkResponse.json()
+
+                    if (walkData.routes && walkData.routes.length > 0) {
+                        map.current!.addSource('walk-to-start', {
+                            type: 'geojson',
+                            data: {
+                                type: 'Feature',
+                                properties: {},
+                                geometry: walkData.routes[0].geometry,
+                            },
+                        })
+
+                        // Dashed blue line for walking
+                        map.current!.addLayer({
+                            id: 'walk-to-start-line',
+                            type: 'line',
+                            source: 'walk-to-start',
+                            layout: {
+                                'line-join': 'round',
+                                'line-cap': 'round',
+                            },
+                            paint: {
+                                'line-color': '#3b82f6',
+                                'line-width': 4,
+                                'line-dasharray': [2, 2],
+                            },
+                        })
                     }
-
-                    directionsServiceRef.current.route(walkRequest, (result, status) => {
-                        if (status === google.maps.DirectionsStatus.OK && result) {
-                            const path = result.routes[0].overview_path
-                            const walkPolyline = new google.maps.Polyline({
-                                path,
-                                strokeColor: '#3b82f6',
-                                strokeOpacity: 0.8,
-                                strokeWeight: 4,
-                                map,
-                            })
-                            // Make it dashed using icons
-                            walkPolyline.setOptions({
-                                icons: [{
-                                    icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
-                                    offset: '0',
-                                    repeat: '15px'
-                                }],
-                                strokeOpacity: 0
-                            })
-                            journeyPolylinesRef.current.push(walkPolyline)
-                        }
-                    })
                 }
             }
 
-            // Request driving directions for the troski route
-            const request: google.maps.DirectionsRequest = {
-                origin: { lat: journey.route.origin_latitude, lng: journey.route.origin_longitude },
-                destination: { lat: journey.route.destination_latitude, lng: journey.route.destination_longitude },
-                waypoints,
-                travelMode: google.maps.TravelMode.DRIVING,
+            // Fetch route from Mapbox Directions API
+            const coordsString = waypoints.map(coord => `${coord[0]},${coord[1]}`).join(';')
+            const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coordsString}?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}&geometries=geojson&overview=full`
+
+            const response = await fetch(url)
+            const data = await response.json()
+
+            if (data.routes && data.routes.length > 0) {
+                // Use actual road-following geometry from Directions API
+                const routeGeometry = data.routes[0].geometry
+
+                // Add source
+                map.current!.addSource('journey-route', {
+                    type: 'geojson',
+                    data: {
+                        type: 'Feature',
+                        properties: {},
+                        geometry: routeGeometry,
+                    },
+                })
+
+                // Add casing layer (outline)
+                map.current!.addLayer({
+                    id: 'journey-line-casing',
+                    type: 'line',
+                    source: 'journey-route',
+                    layout: {
+                        'line-join': 'round',
+                        'line-cap': 'round',
+                    },
+                    paint: {
+                        'line-color': '#064e3b',
+                        'line-width': 8,
+                    },
+                })
+
+                // Add main line layer
+                map.current!.addLayer({
+                    id: 'journey-line',
+                    type: 'line',
+                    source: 'journey-route',
+                    layout: {
+                        'line-join': 'round',
+                        'line-cap': 'round',
+                    },
+                    paint: {
+                        'line-color': '#10b981',
+                        'line-width': 5,
+                    },
+                })
+            } else {
+                // Fallback to straight lines if Directions API fails
+                console.warn('Directions API failed, using straight lines')
+                addStraightLineRoute(waypoints)
             }
-
-            directionsServiceRef.current.route(request, (result, status) => {
-                if (status === google.maps.DirectionsStatus.OK && result) {
-                    const path = result.routes[0].overview_path
-
-                    // Casing (outline)
-                    const casingPolyline = new google.maps.Polyline({
-                        path,
-                        strokeColor: '#064e3b',
-                        strokeOpacity: 1,
-                        strokeWeight: 8,
-                        map,
-                        zIndex: 1,
-                    })
-                    journeyPolylinesRef.current.push(casingPolyline)
-
-                    // Main line
-                    const mainPolyline = new google.maps.Polyline({
-                        path,
-                        strokeColor: '#10b981',
-                        strokeOpacity: 1,
-                        strokeWeight: 5,
-                        map,
-                        zIndex: 2,
-                    })
-                    journeyPolylinesRef.current.push(mainPolyline)
-                } else {
-                    // Fallback to straight lines
-                    const coordinates: google.maps.LatLngLiteral[] = [
-                        { lat: journey.route.origin_latitude, lng: journey.route.origin_longitude },
-                        ...journey.stops.map((stop) => ({ lat: stop.stop_latitude, lng: stop.stop_longitude })),
-                        { lat: journey.route.destination_latitude, lng: journey.route.destination_longitude },
-                    ]
-
-                    const polyline = new google.maps.Polyline({
-                        path: coordinates,
-                        strokeColor: '#10b981',
-                        strokeOpacity: 0.8,
-                        strokeWeight: 4,
-                        map,
-                    })
-                    journeyPolylinesRef.current.push(polyline)
-                }
-            })
         } catch (error) {
-            console.error('Error drawing journey:', error)
+            console.error('Error fetching directions:', error)
+            // Fallback to straight lines
+            addStraightLineRoute(waypoints)
         }
 
-        // Add markers
+        // Add markers for journey stops
         addJourneyMarkers(journey)
+    }
+
+    // Fallback: Add straight line route
+    const addStraightLineRoute = (coordinates: [number, number][]) => {
+        if (!map.current) return
+
+        map.current.addSource('journey-route', {
+            type: 'geojson',
+            data: {
+                type: 'Feature',
+                properties: {},
+                geometry: {
+                    type: 'LineString',
+                    coordinates,
+                },
+            },
+        })
+
+        map.current.addLayer({
+            id: 'journey-line',
+            type: 'line',
+            source: 'journey-route',
+            layout: {
+                'line-join': 'round',
+                'line-cap': 'round',
+            },
+            paint: {
+                'line-color': '#10b981',
+                'line-width': 4,
+                'line-dasharray': [2, 1],
+            },
+        })
     }
 
     // Add markers for journey stops
     const addJourneyMarkers = (journey: JourneyResult) => {
-        if (!map) return
+        if (!map.current) return
 
-        // Origin marker
-        const originMarker = new google.maps.Marker({
-            position: { lat: journey.route.origin_latitude, lng: journey.route.origin_longitude },
-            map,
-            icon: {
-                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-                        <circle cx="16" cy="16" r="14" fill="#3b82f6" stroke="white" stroke-width="2"/>
-                        <text x="16" y="21" font-size="16" text-anchor="middle" fill="white">📍</text>
-                    </svg>
-                `),
-                scaledSize: new google.maps.Size(32, 32),
-                anchor: new google.maps.Point(16, 16),
-            },
-            zIndex: 10,
-        })
-
-        const originInfo = new google.maps.InfoWindow({
-            content: `
-                <div style="padding: 8px;">
-                    <h3 style="font-weight: 600; font-size: 14px;">${journey.route.origin_name}</h3>
-                    <p style="font-size: 12px; color: #3b82f6;">Start here</p>
+        // Add origin marker
+        const originEl = document.createElement('div')
+        originEl.className = 'journey-stop-marker'
+        originEl.innerHTML = `
+            <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                </svg>
+            </div>
+        `
+        new mapboxgl.Marker({ element: originEl })
+            .setLngLat([journey.route.origin_longitude, journey.route.origin_latitude])
+            .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
+                <div class="p-2">
+                    <h3 class="font-semibold text-sm">${journey.route.origin_name}</h3>
+                    <p class="text-xs text-blue-600">Start here</p>
                 </div>
-            `,
-        })
-        originMarker.addListener('click', () => originInfo.open(map, originMarker))
-        journeyMarkersRef.current.push(originMarker)
+            `))
+            .addTo(map.current!)
 
-        // Stop markers
+        // Add stop markers
         journey.stops.forEach((stop, index) => {
-            const bgColor = stop.stop_type === 'board' ? '#3b82f6' : stop.stop_type === 'alight' ? '#f97316' : '#8b5cf6'
+            const el = document.createElement('div')
+            el.className = 'journey-stop-marker'
 
-            const marker = new google.maps.Marker({
-                position: { lat: stop.stop_latitude, lng: stop.stop_longitude },
-                map,
-                icon: {
-                    url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
-                            <circle cx="12" cy="12" r="10" fill="${bgColor}" stroke="white" stroke-width="2"/>
-                            <text x="12" y="16" font-size="12" text-anchor="middle" fill="white" font-weight="bold">${index + 1}</text>
-                        </svg>
-                    `),
-                    scaledSize: new google.maps.Size(24, 24),
-                    anchor: new google.maps.Point(12, 12),
-                },
-                zIndex: 10,
-            })
+            const bgColor = stop.stop_type === 'board' ? 'bg-blue-500' : stop.stop_type === 'alight' ? 'bg-orange-500' : 'bg-purple-500'
 
-            const info = new google.maps.InfoWindow({
-                content: `
-                    <div style="padding: 8px;">
-                        <h3 style="font-weight: 600; font-size: 14px;">${stop.stop_name}</h3>
-                        <p style="font-size: 12px; color: #666; text-transform: capitalize;">${stop.stop_type}</p>
-                        ${stop.troski_description ? `<p style="font-size: 12px; margin-top: 4px;">${stop.troski_description}</p>` : ''}
-                    </div>
-                `,
-            })
-            marker.addListener('click', () => info.open(map, marker))
-            journeyMarkersRef.current.push(marker)
+            el.innerHTML = `
+        <div class="w-6 h-6 ${bgColor} rounded-full flex items-center justify-center shadow-lg border-2 border-white text-white text-xs font-bold">
+          ${index + 1}
+        </div>
+      `
+
+            new mapboxgl.Marker({ element: el })
+                .setLngLat([stop.stop_longitude, stop.stop_latitude])
+                .setPopup(
+                    new mapboxgl.Popup({ offset: 25 }).setHTML(`
+            <div class="p-2">
+              <h3 class="font-semibold text-sm">${stop.stop_name}</h3>
+              <p class="text-xs text-gray-500 capitalize">${stop.stop_type}</p>
+              ${stop.troski_description ? `<p class="text-xs mt-1">${stop.troski_description}</p>` : ''}
+            </div>
+          `)
+                )
+                .addTo(map.current!)
         })
 
-        // Destination marker
-        const destMarker = new google.maps.Marker({
-            position: { lat: journey.route.destination_latitude, lng: journey.route.destination_longitude },
-            map,
-            icon: {
-                url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
-                        <circle cx="16" cy="16" r="14" fill="#f97316" stroke="white" stroke-width="2"/>
-                        <text x="16" y="21" font-size="16" text-anchor="middle" fill="white">🎯</text>
-                    </svg>
-                `),
-                scaledSize: new google.maps.Size(32, 32),
-                anchor: new google.maps.Point(16, 16),
-            },
-            zIndex: 10,
-        })
-
-        const destInfo = new google.maps.InfoWindow({
-            content: `
-                <div style="padding: 8px;">
-                    <h3 style="font-weight: 600; font-size: 14px;">${journey.route.destination_name}</h3>
-                    <p style="font-size: 12px; color: #f97316;">Destination</p>
+        // Add destination marker
+        const destEl = document.createElement('div')
+        destEl.className = 'journey-stop-marker'
+        destEl.innerHTML = `
+            <div class="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+                    <circle cx="12" cy="10" r="3"/>
+                </svg>
+            </div>
+        `
+        new mapboxgl.Marker({ element: destEl })
+            .setLngLat([journey.route.destination_longitude, journey.route.destination_latitude])
+            .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(`
+                <div class="p-2">
+                    <h3 class="font-semibold text-sm">${journey.route.destination_name}</h3>
+                    <p class="text-xs text-orange-600">Destination</p>
                 </div>
-            `,
-        })
-        destMarker.addListener('click', () => destInfo.open(map, destMarker))
-        journeyMarkersRef.current.push(destMarker)
+            `))
+            .addTo(map.current!)
     }
 
-    // Cancel distance warning
-    const cancelDistanceWarning = () => {
-        setDistanceWarning({ show: false, distance: 0, originName: '', journey: null })
-    }
-
-    // Close the journey view
-    const closeJourneyView = () => {
-        setSelectedJourney(null)
-    }
-
-    // Clear journey from map completely
+    // Clear journey from map completely (for new search)
     const clearJourney = () => {
         setSelectedJourney(null)
         setDestinationQuery('')
 
-        journeyPolylinesRef.current.forEach((polyline) => polyline.setMap(null))
-        journeyPolylinesRef.current = []
-        journeyMarkersRef.current.forEach((marker) => marker.setMap(null))
-        journeyMarkersRef.current = []
+        if (!map.current) return
 
+        if (map.current.getLayer('journey-line')) {
+            map.current.removeLayer('journey-line')
+        }
+        if (map.current.getLayer('journey-line-casing')) {
+            map.current.removeLayer('journey-line-casing')
+        }
+        if (map.current.getLayer('walk-to-start-line')) {
+            map.current.removeLayer('walk-to-start-line')
+        }
+        if (map.current.getSource('journey-route')) {
+            map.current.removeSource('journey-route')
+        }
+        if (map.current.getSource('walk-to-start')) {
+            map.current.removeSource('walk-to-start')
+        }
+
+        // Remove journey markers
+        document.querySelectorAll('.journey-stop-marker').forEach(el => el.remove())
+
+        // Reload stops
         loadTroskiStops()
     }
 
@@ -726,48 +780,17 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
         })
     }
 
-    // Handle load error
-    if (loadError) {
-        return (
-            <div className="absolute inset-0 flex items-center justify-center bg-background z-50">
-                <div className="text-destructive p-4 text-center">
-                    <div className="text-lg mb-2">Failed to load Google Maps</div>
-                    <div className="text-sm">{loadError.message}</div>
-                </div>
-            </div>
-        )
-    }
-
     return (
         <div className={`relative h-full w-full bg-background overflow-hidden ${className}`}>
             {/* Map container */}
-            {isLoaded ? (
-                <GoogleMap
-                    mapContainerStyle={containerStyle}
-                    center={defaultCenter}
-                    zoom={zoom}
-                    onLoad={onLoad}
-                    onUnmount={onUnmount}
-                    onCenterChanged={handleCenterChanged}
-                    onZoomChanged={handleZoomChanged}
-                    options={{
-                        disableDefaultUI: true,
-                        zoomControl: false,
-                        mapTypeControl: false,
-                        streetViewControl: false,
-                        fullscreenControl: false,
-                        styles: resolvedTheme === 'dark' ? DARK_MAP_STYLE : LIGHT_MAP_STYLE,
-                        gestureHandling: 'greedy',
-                    }}
-                />
-            ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-background z-50">
-                    <div className="text-foreground text-sm">Loading Troski Map...</div>
-                </div>
-            )}
+            <div
+                ref={mapContainer}
+                className="absolute inset-0 z-0"
+                style={{ width: '100%', height: '100%' }}
+            />
 
             {/* Loading indicator */}
-            {isLoaded && !mapLoaded && !mapError && (
+            {!mapLoaded && !mapError && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background z-50">
                     <div className="text-foreground text-sm">Loading Troski Map...</div>
                 </div>
