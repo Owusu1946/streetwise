@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useConversation } from '@elevenlabs/react'
-import { PhoneOff, Mic, MicOff, Phone, Video, MessageCircle } from 'lucide-react'
+import { PhoneOff, Mic, MicOff, Phone, Video, MessageCircle, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Orb } from '@/components/ui/orb'
 import { cn } from '@/lib/utils'
@@ -180,34 +180,34 @@ export default function FakeCallPage() {
         </div>
 
         {/* Bottom Section: Controls */}
-        <div className="mb-8">
+        <div className="mb-8 w-full max-w-sm mx-auto">
           {callStatus === 'incoming' ? (
-            <div className="space-y-20">
+            <div className="flex flex-col justify-end h-full pb-8">
               {/* Action Buttons (Remind Me / Message) */}
-              <div className="flex justify-between px-4">
+              <div className="flex justify-between px-4 mb-20">
                 <div className="flex flex-col items-center gap-2">
-                  <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
-                    <MessageCircle className="w-6 h-6 text-white" />
+                  <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center active:bg-white/30 transition-colors cursor-pointer">
+                    <Clock className="w-6 h-6 text-white fill-current" />
                   </div>
-                  <span className="text-white text-xs">Message</span>
+                  <span className="text-white text-xs font-medium">Remind Me</span>
                 </div>
                 <div className="flex flex-col items-center gap-2">
-                  <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
-                    <Phone className="w-6 h-6 text-white" />
+                  <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center active:bg-white/30 transition-colors cursor-pointer">
+                    <MessageCircle className="w-6 h-6 text-white fill-current" />
                   </div>
-                  <span className="text-white text-xs">Remind Me</span>
+                  <span className="text-white text-xs font-medium">Message</span>
                 </div>
               </div>
 
               {/* Slide to Answer */}
-              <div className="relative w-full max-w-xs mx-auto">
+              <div className="relative w-full">
                 {/* Slider Track */}
                 <div className="relative h-20 rounded-full bg-white/20 backdrop-blur-md overflow-hidden flex items-center px-2">
                   <motion.div
                     style={{ opacity: slideTextOpacity }}
                     className="absolute inset-0 flex items-center justify-center"
                   >
-                    <span className="text-white font-medium text-lg shimmer-text">slide to answer</span>
+                    <span className="text-white font-medium text-lg shimmer-text tracking-wide">slide to answer</span>
                   </motion.div>
 
                   {/* Slider Knob */}
@@ -222,33 +222,20 @@ export default function FakeCallPage() {
                     <Phone className="w-8 h-8 text-green-600 fill-current" />
                   </motion.div>
                 </div>
-
-                {/* Decline Button (Bottom) */}
-                <div className="mt-8 flex justify-center">
-                  <div className="flex flex-col items-center gap-2">
-                    <button
-                      onClick={() => router.push('/')}
-                      className="w-16 h-16 rounded-full bg-red-500/20 backdrop-blur-md flex items-center justify-center hover:bg-red-500/30 transition-colors"
-                    >
-                      <PhoneOff className="w-8 h-8 text-red-500 fill-current" />
-                    </button>
-                    <span className="text-white text-xs">Decline</span>
-                  </div>
-                </div>
               </div>
             </div>
           ) : (
             /* In-Call Controls */
-            <div className="grid grid-cols-3 gap-x-8 gap-y-8 max-w-sm mx-auto px-4">
+            <div className="grid grid-cols-3 gap-x-6 gap-y-6 sm:gap-x-8 sm:gap-y-8 px-2">
               <div className="flex flex-col items-center gap-2">
-                <Button variant="ghost" size="icon" onClick={toggleMute} className={cn("w-16 h-16 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0", isMuted && "bg-white text-black hover:bg-white/90")}>
+                <Button variant="ghost" size="icon" onClick={toggleMute} className={cn("w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0", isMuted && "bg-white text-black hover:bg-white/90")}>
                   {isMuted ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8 text-white" />}
                 </Button>
                 <span className="text-white text-xs">mute</span>
               </div>
 
               <div className="flex flex-col items-center gap-2">
-                <Button variant="ghost" size="icon" className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0">
+                <Button variant="ghost" size="icon" className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0">
                   <div className="grid grid-cols-3 gap-1 w-6 h-6">
                     {[...Array(9)].map((_, i) => (
                       <div key={i} className="bg-white rounded-full" />
@@ -259,7 +246,7 @@ export default function FakeCallPage() {
               </div>
 
               <div className="flex flex-col items-center gap-2">
-                <Button variant="ghost" size="icon" className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0">
+                <Button variant="ghost" size="icon" className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0">
                   <div className="w-6 h-6 border-2 border-white rounded-full flex items-center justify-center">
                     <div className="w-4 h-2 border-t-2 border-white" />
                   </div>
@@ -268,21 +255,21 @@ export default function FakeCallPage() {
               </div>
 
               <div className="flex flex-col items-center gap-2">
-                <Button variant="ghost" size="icon" className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0">
+                <Button variant="ghost" size="icon" className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0">
                   <PlusIcon className="w-8 h-8 text-white" />
                 </Button>
                 <span className="text-white text-xs">add call</span>
               </div>
 
               <div className="flex flex-col items-center gap-2">
-                <Button variant="ghost" size="icon" className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0">
+                <Button variant="ghost" size="icon" className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0">
                   <Video className="w-8 h-8 text-white" />
                 </Button>
                 <span className="text-white text-xs">FaceTime</span>
               </div>
 
               <div className="flex flex-col items-center gap-2">
-                <Button variant="ghost" size="icon" className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0">
+                <Button variant="ghost" size="icon" className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0">
                   <UserIcon className="w-8 h-8 text-white" />
                 </Button>
                 <span className="text-white text-xs">contacts</span>
@@ -292,7 +279,7 @@ export default function FakeCallPage() {
               <div className="col-span-3 flex justify-center mt-4">
                 <Button
                   onClick={handleEndCall}
-                  className="w-20 h-20 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-lg transition-transform hover:scale-105"
+                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-lg transition-transform hover:scale-105"
                 >
                   <PhoneOff className="w-10 h-10 fill-current" />
                 </Button>
