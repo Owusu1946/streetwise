@@ -32,6 +32,14 @@ export default function SearchDrawerGoogle({
     const autocompleteServiceRef = useRef<google.maps.places.AutocompleteService | null>(null)
     const placesServiceRef = useRef<google.maps.places.PlacesService | null>(null)
     const placesContainerRef = useRef<HTMLDivElement>(null)
+    const [activeIndex, setActiveIndex] = useState(-1)
+
+    // Reset active index when suggestions change
+    useEffect(() => {
+        setActiveIndex(-1)
+    }, [suggestions])
+
+
 
     // Initialize services when drawer opens
     useEffect(() => {
@@ -192,19 +200,37 @@ export default function SearchDrawerGoogle({
         onOpenChange(false)
     }
 
+    // Handle keyboard navigation
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (suggestions.length === 0) return
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault()
+            setActiveIndex((prev) => (prev < suggestions.length - 1 ? prev + 1 : prev))
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault()
+            setActiveIndex((prev) => (prev > 0 ? prev - 1 : -1))
+        } else if (e.key === 'Enter') {
+            e.preventDefault()
+            if (activeIndex >= 0 && suggestions[activeIndex]) {
+                handleSelectSuggestion(suggestions[activeIndex])
+            }
+        }
+    }
+
     return (
         <Drawer.Root open={open} onOpenChange={onOpenChange} modal={true}>
             <Drawer.Portal>
                 <Drawer.Overlay className="fixed inset-0 bg-black/60 z-50" />
-                <Drawer.Content className="fixed inset-0 flex flex-col bg-background z-50">
+                <Drawer.Content className="fixed bottom-0 left-0 right-0 z-50 mt-24 flex h-[96vh] flex-col rounded-t-[10px] bg-background outline-none md:mx-auto md:max-w-md md:h-[85vh] md:bottom-4 md:rounded-[10px] border border-border">
                     {/* Hidden container for PlacesService */}
                     <div ref={placesContainerRef} style={{ display: 'none' }} />
 
+                    {/* Handle bar for mobile */}
+                    <div className="mx-auto mt-4 h-1.5 w-12 rounded-full bg-muted md:hidden" />
+
                     {/* Header with safe area padding */}
-                    <div
-                        className="flex items-center gap-4 p-4 pt-safe border-b border-border shrink-0"
-                        style={{ paddingTop: 'calc(1rem + env(safe-area-inset-top))' }}
-                    >
+                    <div className="flex items-center gap-4 p-4 border-b border-border shrink-0">
                         <button
                             onClick={() => onOpenChange(false)}
                             className="p-2 hover:bg-accent rounded-lg transition-colors"
@@ -218,10 +244,7 @@ export default function SearchDrawerGoogle({
 
                     {/* Content - scrollable area */}
                     <div className="flex-1 overflow-y-auto">
-                        <div
-                            className="p-4 space-y-4"
-                            style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
-                        >
+                        <div className="p-4 space-y-4">
                             {/* Destination input */}
                             <div className="space-y-2">
                                 <div className="relative">
@@ -234,6 +257,7 @@ export default function SearchDrawerGoogle({
                                             setQuery(e.target.value)
                                             handleSearch(e.target.value)
                                         }}
+                                        onKeyDown={handleKeyDown}
                                         className="h-12 text-base pl-12 pr-4 bg-card text-foreground placeholder-muted-foreground border border-border rounded-xl"
                                     />
                                     <Search className="absolute left-4 top-3.5 h-5 w-5 text-muted-foreground" />
@@ -253,11 +277,12 @@ export default function SearchDrawerGoogle({
                                     {suggestions.map((suggestion, index) => (
                                         <button
                                             key={suggestion.place_id || index}
-                                            className="w-full text-left px-4 py-3 hover:bg-accent bg-card border border-border rounded-xl transition-colors"
+                                            className={`w-full text-left px-4 py-3 border border-border rounded-xl transition-colors ${index === activeIndex ? 'bg-accent border-primary' : 'hover:bg-accent bg-card'
+                                                }`}
                                             onClick={() => handleSelectSuggestion(suggestion)}
                                         >
                                             <div className="flex items-start gap-3">
-                                                <MapPin className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                                                <MapPin className={`h-5 w-5 mt-0.5 shrink-0 ${index === activeIndex ? 'text-primary' : 'text-muted-foreground'}`} />
                                                 <div className="flex-1">
                                                     <p className="text-sm text-foreground font-medium">
                                                         {suggestion.structured_formatting.main_text}
