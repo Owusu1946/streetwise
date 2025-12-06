@@ -463,6 +463,9 @@ function MapComponent({ className = '', onEnterTroskiMode }: MapProps) {
                             Feedbacks
                         </ShimmerButton>
                         <InstallPWAButton />
+                        <div className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm border border-white/20 self-start">
+                            BETA
+                        </div>
                     </div>
 
                     {/* Weather Widget */}
