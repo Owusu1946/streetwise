@@ -455,19 +455,9 @@ This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) 
 
 ---
 
-<p align="center">
-  <strong>Built with ❤️ in Ghana 🇬🇭</strong>
-</p>
-
-<p align="center">
-  <a href="https://github.com/Owusu1946">
-    <img src="https://img.shields.io/badge/GitHub-@Owusu1946-181717?logo=github" alt="GitHub" />
-  </a>
-  <a href="https://twitter.com/streetwise_app">
-    <img src="https://img.shields.io/badge/Twitter-@streetwise__app-1DA1F2?logo=twitter" alt="Twitter" />
-  </a>
-</p>
-
-<p align="center">
-  <sub>Making every walk safer, one step at a time.</sub>
-</p>
+<div align="center">
+  <p>Built with ❤️ in Ghana 🇬🇭</p>
+  <p>
+    <a href="https://github.com/Owusu1946">@Owusu1946</a>
+  </p>
+</div>
