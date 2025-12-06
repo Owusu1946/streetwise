@@ -89,7 +89,7 @@ export function useMapNavigationGoogle(map: google.maps.Map | null) {
                 userMarker.current.position = position
             } else {
                 // It's a legacy Marker, use setPosition
-                // @ts-ignore-error - we know it's a Marker if it's not AdvancedMarkerElement
+                // @ts-expect-error - we know it's a Marker if it's not AdvancedMarkerElement
                 userMarker.current.setPosition(position)
             }
         } else {
@@ -221,93 +221,83 @@ export function useMapNavigationGoogle(map: google.maps.Map | null) {
         })
     }, [map, updateUserMarker])
 
-    // Handle destination selection
-    const handleSelectDestination = useCallback(
-        (place: any) => {
-            console.log('handleSelectDestination called with:', place)
-            const coords: [number, number] = place.center
-            console.log('Extracted coords:', coords)
-            setDestinationPlace(place)
-            setDestinationCoords(coords)
-
+    // Display routes on map using Polylines
+    const displayRoutes = useCallback(
+        (routesToDisplay: RouteInfo[], selectedIndex: number) => {
             if (!map) return
 
-            // Close existing info window
-            if (infoWindow.current) {
-                infoWindow.current.close()
-            }
+            // Clear existing polylines
+            routePolylines.current.forEach((polyline) => polyline.setMap(null))
+            routePolylines.current = []
 
-            // Create info window with "Go there" button
-            infoWindow.current = new google.maps.InfoWindow({
-                content: `
-          <div style="padding: 15px; min-width: 180px; text-align: center;">
-            <div style="font-weight: 600; font-size: 16px; margin-bottom: 12px;">${place.text}</div>
-            <button
-              id="go-there-btn"
-              style="
-                background: #635CFF;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 8px;
-                font-weight: 500;
-                cursor: pointer;
-                font-size: 14px;
-                width: 100%;
-              "
-            >
-              Go there
-            </button>
-          </div>
-        `,
-            })
+            // Add each route as a polyline
+            routesToDisplay.forEach((route, index) => {
+                const isSelected = index === selectedIndex
 
-            const position = { lat: coords[1], lng: coords[0] }
+                // Convert GeoJSON coordinates to Google Maps path
+                const path = route.geometry?.coordinates?.map((coord: [number, number]) => ({
+                    lat: coord[1],
+                    lng: coord[0],
+                })) || []
 
-            // Create or update destination marker
-            if (destinationMarker.current) {
-                destinationMarker.current.position = position
-            } else {
-                if (google.maps.marker?.AdvancedMarkerElement) {
-                    const markerElement = createDestinationMarkerElement()
-                    destinationMarker.current = new google.maps.marker.AdvancedMarkerElement({
-                        map,
-                        position,
-                        content: markerElement,
-                    })
-                } else {
-                    const marker = new google.maps.Marker({
-                        map,
-                        position,
-                        icon: {
-                            path: google.maps.SymbolPath.CIRCLE,
-                            scale: 8,
-                            fillColor: '#EF4444',
-                            fillOpacity: 1,
-                            strokeColor: '#ffffff',
-                            strokeWeight: 3,
-                        },
-                    }) as any
-                    destinationMarker.current = marker
-                }
-            }
+                // Determine color based on lighting
+                let strokeColor = '#9CA3AF' // Default gray
 
-            // Open info window
-            infoWindow.current.open(map, destinationMarker.current as any)
+                if (route.lightingPercentage !== undefined) {
+                    const lightingPercent = route.lightingPercentage
 
-            // Add click listener for "Go there" button
-            google.maps.event.addListenerOnce(infoWindow.current, 'domready', () => {
-                const btn = document.getElementById('go-there-btn')
-                if (btn) {
-                    btn.onclick = () => {
-                        handleCalculateRoutes(coords)
+                    if (lightingPercent >= 99) {
+                        strokeColor = '#FCD34D'
+                    } else if (lightingPercent >= 95) {
+                        strokeColor = '#FDE047'
+                    } else if (lightingPercent >= 80) {
+                        strokeColor = '#FB923C'
+                    } else if (lightingPercent >= 45) {
+                        strokeColor = '#F97316'
+                    } else if (lightingPercent >= 30) {
+                        strokeColor = '#EA580C'
+                    } else if (lightingPercent >= 15) {
+                        strokeColor = '#DC2626'
+                    } else {
+                        strokeColor = '#991B1B'
                     }
+                } else if (isSelected) {
+                    strokeColor = '#635CFF'
                 }
+
+                // Create border polyline for selected route
+                if (isSelected) {
+                    const borderPolyline = new google.maps.Polyline({
+                        path,
+                        strokeColor: '#ffffff',
+                        strokeOpacity: 0.3,
+                        strokeWeight: 10,
+                        map,
+                        zIndex: index,
+                    })
+                    routePolylines.current.push(borderPolyline)
+                }
+
+                // Create main polyline
+                const polyline = new google.maps.Polyline({
+                    path,
+                    strokeColor,
+                    strokeOpacity: isSelected ? 0.9 : 0.5,
+                    strokeWeight: isSelected ? 6 : 3,
+                    map,
+                    zIndex: isSelected ? index + 100 : index,
+                })
+                routePolylines.current.push(polyline)
             })
 
-            // Pan to destination
-            map.panTo(position)
-            map.setZoom(15)
+            // Fit map to show all routes
+            const bounds = getBoundsForRoutes(routesToDisplay)
+            map.fitBounds(bounds, {
+                top: 100,
+                bottom: 300,
+                left: 50,
+                right: 50,
+            })
         },
         [map]
     )
@@ -402,88 +392,98 @@ export function useMapNavigationGoogle(map: google.maps.Map | null) {
                 setNavigationState('idle')
             }
         },
-        [destinationCoords, getUserLocation]
+        [destinationCoords, getUserLocation, displayRoutes]
     )
 
-    // Display routes on map using Polylines
-    const displayRoutes = useCallback(
-        (routesToDisplay: RouteInfo[], selectedIndex: number) => {
+    // Handle destination selection
+    const handleSelectDestination = useCallback(
+        (place: any) => {
+            console.log('handleSelectDestination called with:', place)
+            const coords: [number, number] = place.center
+            console.log('Extracted coords:', coords)
+            setDestinationPlace(place)
+            setDestinationCoords(coords)
+
             if (!map) return
 
-            // Clear existing polylines
-            routePolylines.current.forEach((polyline) => polyline.setMap(null))
-            routePolylines.current = []
+            // Close existing info window
+            if (infoWindow.current) {
+                infoWindow.current.close()
+            }
 
-            // Add each route as a polyline
-            routesToDisplay.forEach((route, index) => {
-                const isSelected = index === selectedIndex
+            // Create info window with "Go there" button
+            infoWindow.current = new google.maps.InfoWindow({
+                content: `
+          <div style="padding: 15px; min-width: 180px; text-align: center;">
+            <div style="font-weight: 600; font-size: 16px; margin-bottom: 12px;">${place.text}</div>
+            <button
+              id="go-there-btn"
+              style="
+                background: #635CFF;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 8px;
+                font-weight: 500;
+                cursor: pointer;
+                font-size: 14px;
+                width: 100%;
+              "
+            >
+              Go there
+            </button>
+          </div>
+        `,
+            })
 
-                // Convert GeoJSON coordinates to Google Maps path
-                const path = route.geometry?.coordinates?.map((coord: [number, number]) => ({
-                    lat: coord[1],
-                    lng: coord[0],
-                })) || []
+            const position = { lat: coords[1], lng: coords[0] }
 
-                // Determine color based on lighting
-                let strokeColor = '#9CA3AF' // Default gray
-
-                if (route.lightingPercentage !== undefined) {
-                    const lightingPercent = route.lightingPercentage
-
-                    if (lightingPercent >= 99) {
-                        strokeColor = '#FCD34D'
-                    } else if (lightingPercent >= 95) {
-                        strokeColor = '#FDE047'
-                    } else if (lightingPercent >= 80) {
-                        strokeColor = '#FB923C'
-                    } else if (lightingPercent >= 45) {
-                        strokeColor = '#F97316'
-                    } else if (lightingPercent >= 30) {
-                        strokeColor = '#EA580C'
-                    } else if (lightingPercent >= 15) {
-                        strokeColor = '#DC2626'
-                    } else {
-                        strokeColor = '#991B1B'
-                    }
-                } else if (isSelected) {
-                    strokeColor = '#635CFF'
-                }
-
-                // Create border polyline for selected route
-                if (isSelected) {
-                    const borderPolyline = new google.maps.Polyline({
-                        path,
-                        strokeColor: '#ffffff',
-                        strokeOpacity: 0.3,
-                        strokeWeight: 10,
+            // Create or update destination marker
+            if (destinationMarker.current) {
+                destinationMarker.current.position = position
+            } else {
+                if (google.maps.marker?.AdvancedMarkerElement) {
+                    const markerElement = createDestinationMarkerElement()
+                    destinationMarker.current = new google.maps.marker.AdvancedMarkerElement({
                         map,
-                        zIndex: index,
+                        position,
+                        content: markerElement,
                     })
-                    routePolylines.current.push(borderPolyline)
+                } else {
+                    const marker = new google.maps.Marker({
+                        map,
+                        position,
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            scale: 8,
+                            fillColor: '#EF4444',
+                            fillOpacity: 1,
+                            strokeColor: '#ffffff',
+                            strokeWeight: 3,
+                        },
+                    }) as any
+                    destinationMarker.current = marker
                 }
+            }
 
-                // Create main polyline
-                const polyline = new google.maps.Polyline({
-                    path,
-                    strokeColor,
-                    strokeOpacity: isSelected ? 0.9 : 0.5,
-                    strokeWeight: isSelected ? 6 : 3,
-                    map,
-                    zIndex: isSelected ? index + 100 : index,
-                })
-                routePolylines.current.push(polyline)
+            // Open info window
+            infoWindow.current.open(map, destinationMarker.current as any)
+
+            // Add click listener for "Go there" button
+            google.maps.event.addListenerOnce(infoWindow.current, 'domready', () => {
+                const btn = document.getElementById('go-there-btn')
+                if (btn) {
+                    btn.onclick = () => {
+                        handleCalculateRoutes(coords)
+                    }
+                }
             })
 
-            // Fit map to show all routes
-            const bounds = getBoundsForRoutes(routesToDisplay)
-            map.fitBounds(bounds, {
-                top: 100,
-                bottom: 300,
-                left: 50,
-                right: 50,
-            })
+            // Pan to destination
+            map.panTo(position)
+            map.setZoom(15)
         },
-        [map]
+        [map, handleCalculateRoutes]
     )
 
     // Handle route selection
