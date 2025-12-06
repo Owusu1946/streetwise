@@ -75,11 +75,15 @@ export default function SOSDrawer({
       6
     )}, ${googleMapsLink}. Sent from Streetwise`
 
-    // Create SMS links for each contact
-    contacts.forEach((contact) => {
-      const smsLink = `sms:${contact.phone}?body=${encodeURIComponent(message)}`
-      window.open(smsLink, '_blank')
-    })
+    // Create a single SMS link for all contacts
+    const phoneNumbers = contacts.map((c) => c.phone).join(',')
+    const isiOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+
+    // iOS uses '&' for the body separator, others use '?'
+    const separator = isiOS ? '&' : '?'
+    const smsLink = `sms:${phoneNumbers}${separator}body=${encodeURIComponent(message)}`
+
+    window.location.href = smsLink
 
     toast.success('Emergency alerts sent', {
       description: `Notified ${contacts.length} contact${contacts.length > 1 ? 's' : ''}`,
