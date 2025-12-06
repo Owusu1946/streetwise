@@ -847,19 +847,24 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
                 )}
             </AnimatePresence>
 
-            {/* Top bar - Mode indicator & Exit */}
-            <div className="absolute top-6 left-6 right-6 z-10 flex items-center justify-between">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onExitTroskiMode}
-                    className="bg-card/90 backdrop-blur-sm"
-                >
-                    <ChevronLeft className="h-4 w-4 mr-1" />
-                    Exit Troski
-                </Button>
+            {/* Top controls */}
+            <div className="absolute top-6 left-6 right-6 z-10 flex items-center justify-between pointer-events-none">
+                <div className="flex flex-col gap-3 pointer-events-auto">
+                    <Button
+                        variant="secondary"
+                        size="sm"
+                        className="shadow-md"
+                        onClick={onExitTroskiMode}
+                    >
+                        <ChevronLeft className="h-4 w-4 mr-1" />
+                        Back
+                    </Button>
+                    <div className="bg-emerald-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm border border-white/20 self-start">
+                        BETA
+                    </div>
+                </div>
 
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500 text-white text-sm font-medium shadow-lg">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500 text-white text-sm font-medium shadow-lg pointer-events-auto">
                     <Bus className="h-4 w-4" />
                     Troski Mode
                     {isTracking && (
@@ -869,7 +874,7 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
 
                 <button
                     onClick={centerOnUser}
-                    className="bg-card rounded-full p-3 shadow-md hover:shadow-lg transition-shadow border border-border"
+                    className="bg-card rounded-full p-3 shadow-md hover:shadow-lg transition-shadow border border-border pointer-events-auto"
                     aria-label="My location"
                 >
                     <Navigation className="h-5 w-5 text-foreground" />

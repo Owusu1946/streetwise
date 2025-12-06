@@ -49,7 +49,7 @@ export default function RouteSelection({
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
         className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-t border-border"
       >
-        <div className="p-4 space-y-3 max-w-lg mx-auto">
+        <div className="p-3 sm:p-4 space-y-3 max-w-lg mx-auto">
           <div className="flex items-center gap-3 mb-2">
             <Button variant="ghost" size="icon" onClick={onBack} className="h-8 w-8">
               <ArrowLeft className="h-4 w-4" />
@@ -67,25 +67,24 @@ export default function RouteSelection({
               return (
                 <Card
                   key={index}
-                  className={`p-4 cursor-pointer transition-all ${
-                    isSelected
+                  className={`p-3 sm:p-4 cursor-pointer transition-all ${isSelected
                       ? 'bg-primary/10 border-primary shadow-lg'
                       : 'bg-card border-border hover:bg-accent'
-                  }`}
+                    }`}
                   onClick={() => onSelectRoute(index)}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-foreground">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                        <span className="font-medium text-foreground text-sm sm:text-base truncate">
                           {routes.length === 1
-                            ? 'Fastest & Safest route'
+                            ? 'Fastest & Safest'
                             : isSafest
                               ? 'Safest route'
                               : 'Fastest route'}
                         </span>
                         {(routes.length === 1 || (isSafest && routes.length > 1)) && (
-                          <span className="text-xs bg-green-500/20 text-green-600 px-2 py-0.5 rounded-full">
+                          <span className="text-[10px] sm:text-xs bg-green-500/20 text-green-600 px-1.5 py-0.5 rounded-full whitespace-nowrap">
                             Recommended
                           </span>
                         )}
@@ -93,15 +92,14 @@ export default function RouteSelection({
                         {route.lightingPercentage !== undefined &&
                           route.lightingPercentage >= 80 && (
                             <span
-                              className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
-                                route.lightingPercentage >= 90
+                              className={`text-[10px] sm:text-xs px-1.5 py-0.5 rounded-full flex items-center gap-1 whitespace-nowrap ${route.lightingPercentage >= 90
                                   ? 'bg-yellow-500/20 text-yellow-600'
                                   : route.lightingPercentage >= 70
                                     ? 'bg-orange-500/20 text-orange-600'
                                     : route.lightingPercentage >= 50
                                       ? 'bg-orange-600/20 text-orange-700'
                                       : 'bg-red-500/20 text-red-600'
-                              }`}
+                                }`}
                             >
                               {route.lightingPercentage === 100
                                 ? 'Fully lit'
@@ -110,33 +108,32 @@ export default function RouteSelection({
                           )}
                       </div>
 
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
+                          <Clock className="h-3 w-3 shrink-0" />
                           <span>{formatDuration(route.duration)}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <Route className="h-3 w-3" />
+                          <Route className="h-3 w-3 shrink-0" />
                           <span>{formatDistance(route.distance)}</span>
                         </div>
                         {route.safetyScore && (
                           <div className="flex items-center gap-1">
-                            <Shield className="h-3 w-3" />
+                            <Shield className="h-3 w-3 shrink-0" />
                             <span>Safety: {route.safetyScore}/10</span>
                           </div>
                         )}
                         {/* Always show lighting percentage */}
                         <div className="flex items-center gap-1">
-                          <Lightbulb className="h-3 w-3" />
+                          <Lightbulb className="h-3 w-3 shrink-0" />
                           <span>{(route.lightingPercentage ?? 0).toFixed(0)}% lit</span>
                         </div>
                       </div>
                     </div>
 
                     <ChevronRight
-                      className={`h-5 w-5 transition-colors ${
-                        isSelected ? 'text-primary' : 'text-muted-foreground'
-                      }`}
+                      className={`h-5 w-5 shrink-0 transition-colors ${isSelected ? 'text-primary' : 'text-muted-foreground'
+                        }`}
                     />
                   </div>
                 </Card>
@@ -147,7 +144,7 @@ export default function RouteSelection({
           {/* Start navigation button */}
           <Button
             onClick={onStartNavigation}
-            className="w-full h-14 text-base font-semibold rounded-xl shadow-xl"
+            className="w-full h-12 sm:h-14 text-sm sm:text-base font-semibold rounded-xl shadow-xl"
             size="lg"
           >
             Go now
