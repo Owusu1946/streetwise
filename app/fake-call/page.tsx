@@ -3,30 +3,37 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useConversation } from '@elevenlabs/react'
-import { PhoneOff, Mic, MicOff } from 'lucide-react'
+import { PhoneOff, Mic, MicOff, Phone, Video, MessageCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Orb } from '@/components/ui/orb'
 import { cn } from '@/lib/utils'
+import { motion, useMotionValue, useTransform, animate } from 'framer-motion'
 
 export default function FakeCallPage() {
   const router = useRouter()
-  const [isConnected, setIsConnected] = useState(false)
+  const [callStatus, setCallStatus] = useState<'incoming' | 'connected' | 'ended'>('incoming')
   const [isMuted, setIsMuted] = useState(false)
   const [callDuration, setCallDuration] = useState(0)
   const [agentState, setAgentState] = useState<'thinking' | 'listening' | 'talking' | null>(null)
   const callStartTime = useRef<number | null>(null)
   const durationInterval = useRef<NodeJS.Timeout | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+  // Slide to answer logic
+  const dragX = useMotionValue(0)
+  const slideOpacity = useTransform(dragX, [0, 200], [1, 0])
+  const slideTextOpacity = useTransform(dragX, [0, 150], [1, 0])
+  const slideBackgroundOpacity = useTransform(dragX, [0, 200], [0.2, 0])
 
   const conversation = useConversation({
     onConnect: () => {
       console.log('Connected to ElevenLabs')
-      setIsConnected(true)
       callStartTime.current = Date.now()
       startDurationTimer()
     },
     onDisconnect: () => {
       console.log('Disconnected from ElevenLabs')
-      setIsConnected(false)
+      setCallStatus('ended')
       stopDurationTimer()
       router.push('/')
     },
@@ -34,7 +41,6 @@ export default function FakeCallPage() {
       console.error('ElevenLabs error:', error)
     },
     onModeChange: ({ mode }) => {
-      // Update agent state based on conversation mode
       if (mode === 'speaking') {
         setAgentState('talking')
       } else if (mode === 'listening') {
@@ -45,35 +51,37 @@ export default function FakeCallPage() {
     },
   })
 
-  // Start the conversation when component mounts
+  // Handle ringtone
   useEffect(() => {
-    const startCall = async () => {
-      try {
-        // Request microphone permission
-        await navigator.mediaDevices.getUserMedia({ audio: true })
-
-        // Start the conversation
-        await conversation.startSession({
-          agentId: process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID!,
-          connectionType: 'webrtc',
-        })
-      } catch (error) {
-        console.error('Failed to start call:', error)
-        // If error, go back to main page
-        router.push('/')
+    if (callStatus === 'incoming') {
+      // Create audio element for ringtone
+      audioRef.current = new Audio('/ringtones/default ios.mp3')
+      audioRef.current.loop = true
+      audioRef.current.play().catch(e => console.log('Audio play failed (user interaction needed):', e))
+    } else {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
       }
     }
 
-    startCall()
-
-    // Cleanup on unmount
     return () => {
-      if (isConnected) {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+    }
+  }, [callStatus])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (callStatus === 'connected') {
         conversation.endSession()
       }
       stopDurationTimer()
     }
-  }, [])
+  }, [callStatus])
 
   const startDurationTimer = () => {
     durationInterval.current = setInterval(() => {
@@ -97,88 +105,231 @@ export default function FakeCallPage() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
+  const handleAnswer = async () => {
+    setCallStatus('connected')
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true })
+      await conversation.startSession({
+        agentId: process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID!,
+        connectionType: 'webrtc',
+      })
+    } catch (error) {
+      console.error('Failed to start call:', error)
+      router.push('/')
+    }
+  }
+
   const handleEndCall = async () => {
-    await conversation.endSession()
+    if (callStatus === 'connected') {
+      await conversation.endSession()
+    }
+    setCallStatus('ended')
+    router.push('/')
   }
 
   const toggleMute = () => {
     setIsMuted(!isMuted)
-    // Note: You might need to implement actual mute functionality
-    // depending on ElevenLabs SDK capabilities
+  }
+
+  const handleDragEnd = () => {
+    if (dragX.get() > 200) {
+      handleAnswer()
+    } else {
+      animate(dragX, 0)
+    }
   }
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-gray-900 via-black to-gray-900 flex flex-col items-center justify-between p-8 overflow-hidden">
-      {/* Background blur effect */}
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+    <div className="fixed inset-0 bg-black overflow-hidden font-sans">
+      {/* Background Image/Blur */}
+      <div
+        className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1555041469-a586c61ea9bc?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center opacity-50 blur-xl scale-110"
+      />
 
-      {/* Content */}
-      <div className="relative z-10 flex flex-col items-center justify-between h-full w-full max-w-md">
-        {/* Top section */}
-        <div className="flex flex-col items-center pt-12">
-          <p className="text-white/60 text-sm mb-2">calling...</p>
-          <h2 className="text-white text-2xl font-semibold mb-1">Kenneth</h2>
-          <p className="text-white/60 text-sm">Mobile 0559182794</p>
+      {/* Content Container */}
+      <div className="relative z-10 h-full flex flex-col px-6 py-12">
+
+        {/* Top Section: Caller Info */}
+        <div className="flex flex-col items-center mt-12 space-y-2">
+          {callStatus === 'incoming' && (
+            <div className="flex items-center gap-2 text-gray-200 mb-2">
+              <Phone className="w-4 h-4 fill-current" />
+              <span className="text-sm font-medium">Streetwise Audio...</span>
+            </div>
+          )}
+          <h1 className="text-4xl font-semibold text-white tracking-tight">Kenneth</h1>
+          {callStatus === 'incoming' ? (
+            <p className="text-xl text-white/80">Mobile</p>
+          ) : (
+            <p className="text-xl text-white/80">{formatDuration(callDuration)}</p>
+          )}
         </div>
 
-        {/* Middle section - Animated Orb */}
+        {/* Middle Section */}
         <div className="flex-1 flex items-center justify-center">
-          <div className="w-64 h-64">
-            <Orb
-              agentState={agentState}
-              getInputVolume={conversation.getInputVolume}
-              getOutputVolume={conversation.getOutputVolume}
-              colors={['#635CFF', '#8B7FFF']}
-            />
-          </div>
+          {callStatus === 'connected' && (
+            <div className="w-72 h-72 relative">
+              <Orb
+                agentState={agentState}
+                getInputVolume={conversation.getInputVolume}
+                getOutputVolume={conversation.getOutputVolume}
+                colors={['#34C759', '#32ADE6']}
+              />
+            </div>
+          )}
         </div>
 
-        {/* Call duration */}
+        {/* Bottom Section: Controls */}
         <div className="mb-8">
-          <p className="text-white text-lg font-mono">
-            {isConnected ? formatDuration(callDuration) : 'Connecting...'}
-          </p>
-        </div>
+          {callStatus === 'incoming' ? (
+            <div className="space-y-20">
+              {/* Action Buttons (Remind Me / Message) */}
+              <div className="flex justify-between px-4">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
+                    <MessageCircle className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-white text-xs">Message</span>
+                </div>
+                <div className="flex flex-col items-center gap-2">
+                  <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center">
+                    <Phone className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-white text-xs">Remind Me</span>
+                </div>
+              </div>
 
-        {/* Bottom controls */}
-        <div className="flex items-center justify-center gap-6 pb-12">
-          {/* Mute button */}
-          <Button
-            onClick={toggleMute}
-            variant="outline"
-            size="icon"
-            className={cn(
-              'w-14 h-14 rounded-full border-2 transition-all',
-              isMuted
-                ? 'bg-white/20 border-white/40 text-white hover:bg-white/30'
-                : 'bg-transparent border-white/20 text-white/60 hover:bg-white/10'
-            )}
-          >
-            {isMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
-          </Button>
+              {/* Slide to Answer */}
+              <div className="relative w-full max-w-xs mx-auto">
+                {/* Slider Track */}
+                <div className="relative h-20 rounded-full bg-white/20 backdrop-blur-md overflow-hidden flex items-center px-2">
+                  <motion.div
+                    style={{ opacity: slideTextOpacity }}
+                    className="absolute inset-0 flex items-center justify-center"
+                  >
+                    <span className="text-white font-medium text-lg shimmer-text">slide to answer</span>
+                  </motion.div>
 
-          {/* End call button */}
-          <Button
-            onClick={handleEndCall}
-            className="w-20 h-20 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-2xl transition-all hover:scale-105"
-          >
-            <PhoneOff className="h-8 w-8" />
-          </Button>
+                  {/* Slider Knob */}
+                  <motion.div
+                    drag="x"
+                    dragConstraints={{ left: 0, right: 220 }}
+                    dragElastic={0.1}
+                    onDragEnd={handleDragEnd}
+                    style={{ x: dragX }}
+                    className="relative z-10 w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center cursor-grab active:cursor-grabbing"
+                  >
+                    <Phone className="w-8 h-8 text-green-600 fill-current" />
+                  </motion.div>
+                </div>
 
-          {/* Placeholder for symmetry */}
-          <div className="w-14 h-14" />
+                {/* Decline Button (Bottom) */}
+                <div className="mt-8 flex justify-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <button
+                      onClick={() => router.push('/')}
+                      className="w-16 h-16 rounded-full bg-red-500/20 backdrop-blur-md flex items-center justify-center hover:bg-red-500/30 transition-colors"
+                    >
+                      <PhoneOff className="w-8 h-8 text-red-500 fill-current" />
+                    </button>
+                    <span className="text-white text-xs">Decline</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* In-Call Controls */
+            <div className="grid grid-cols-3 gap-x-8 gap-y-8 max-w-sm mx-auto px-4">
+              <div className="flex flex-col items-center gap-2">
+                <Button variant="ghost" size="icon" onClick={toggleMute} className={cn("w-16 h-16 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0", isMuted && "bg-white text-black hover:bg-white/90")}>
+                  {isMuted ? <MicOff className="w-8 h-8" /> : <Mic className="w-8 h-8 text-white" />}
+                </Button>
+                <span className="text-white text-xs">mute</span>
+              </div>
+
+              <div className="flex flex-col items-center gap-2">
+                <Button variant="ghost" size="icon" className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0">
+                  <div className="grid grid-cols-3 gap-1 w-6 h-6">
+                    {[...Array(9)].map((_, i) => (
+                      <div key={i} className="bg-white rounded-full" />
+                    ))}
+                  </div>
+                </Button>
+                <span className="text-white text-xs">keypad</span>
+              </div>
+
+              <div className="flex flex-col items-center gap-2">
+                <Button variant="ghost" size="icon" className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0">
+                  <div className="w-6 h-6 border-2 border-white rounded-full flex items-center justify-center">
+                    <div className="w-4 h-2 border-t-2 border-white" />
+                  </div>
+                </Button>
+                <span className="text-white text-xs">audio</span>
+              </div>
+
+              <div className="flex flex-col items-center gap-2">
+                <Button variant="ghost" size="icon" className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0">
+                  <PlusIcon className="w-8 h-8 text-white" />
+                </Button>
+                <span className="text-white text-xs">add call</span>
+              </div>
+
+              <div className="flex flex-col items-center gap-2">
+                <Button variant="ghost" size="icon" className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0">
+                  <Video className="w-8 h-8 text-white" />
+                </Button>
+                <span className="text-white text-xs">FaceTime</span>
+              </div>
+
+              <div className="flex flex-col items-center gap-2">
+                <Button variant="ghost" size="icon" className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-md hover:bg-white/30 border-0">
+                  <UserIcon className="w-8 h-8 text-white" />
+                </Button>
+                <span className="text-white text-xs">contacts</span>
+              </div>
+
+              {/* End Call Button (Centered in bottom row) */}
+              <div className="col-span-3 flex justify-center mt-4">
+                <Button
+                  onClick={handleEndCall}
+                  className="w-20 h-20 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-lg transition-transform hover:scale-105"
+                >
+                  <PhoneOff className="w-10 h-10 fill-current" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Status indicator */}
-      {!isConnected && (
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-          <div className="flex items-center gap-3 bg-black/60 backdrop-blur-md rounded-full px-6 py-3">
-            <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-            <p className="text-white/80 text-sm">Connecting to your friend...</p>
-          </div>
-        </div>
-      )}
+      <style jsx global>{`
+        @keyframes shimmer {
+          0% { opacity: 0.5; }
+          50% { opacity: 1; }
+          100% { opacity: 0.5; }
+        }
+        .shimmer-text {
+          animation: shimmer 2s infinite;
+        }
+      `}</style>
     </div>
+  )
+}
+
+function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M5 12h14" />
+      <path d="M12 5v14" />
+    </svg>
+  )
+}
+
+function UserIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
   )
 }
