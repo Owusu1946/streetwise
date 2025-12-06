@@ -36,7 +36,7 @@ export function TroskiSearchDrawer({
     const [loading, setLoading] = useState(false)
     const [searchingJourneys, setSearchingJourneys] = useState(false)
 
-    // Search places using Mapbox Geocoding
+    // Search places using Google Places Autocomplete
     const searchPlaces = useCallback(async (searchQuery: string) => {
         if (!searchQuery || searchQuery.length < 2) {
             setPlaces([])
@@ -45,25 +45,68 @@ export function TroskiSearchDrawer({
 
         setLoading(true)
         try {
-            const proximity = userLocation ? `&proximity=${userLocation[0]},${userLocation[1]}` : ''
-            const response = await fetch(
-                `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?access_token=${process.env.NEXT_PUBLIC_MAPBOX_TOKEN}&country=gh&limit=5${proximity}`
-            )
-            const data = await response.json()
-
-            if (data.features) {
-                setPlaces(
-                    data.features.map((f: any) => ({
-                        id: f.id,
-                        text: f.text,
-                        place_name: f.place_name,
-                        center: f.center,
-                    }))
-                )
+            // Check if Google Maps API is loaded
+            if (typeof google === 'undefined' || !google.maps?.places) {
+                console.error('Google Maps Places API not loaded')
+                setLoading(false)
+                return
             }
+
+            const autocompleteService = new google.maps.places.AutocompleteService()
+
+            const request: google.maps.places.AutocompletionRequest = {
+                input: searchQuery,
+                componentRestrictions: { country: 'gh' },
+            }
+
+            // Add location bias if user location is available
+            if (userLocation) {
+                request.location = new google.maps.LatLng(userLocation[1], userLocation[0])
+                request.radius = 50000 // 50km radius
+            }
+
+            autocompleteService.getPlacePredictions(request, (predictions, status) => {
+                if (status === google.maps.places.PlacesServiceStatus.OK && predictions) {
+                    // Get place details for each prediction to get coordinates
+                    const placesService = new google.maps.places.PlacesService(
+                        document.createElement('div')
+                    )
+
+                    const placePromises = predictions.slice(0, 5).map(
+                        (prediction) =>
+                            new Promise<PlaceResult | null>((resolve) => {
+                                placesService.getDetails(
+                                    { placeId: prediction.place_id, fields: ['geometry', 'name', 'formatted_address'] },
+                                    (place, detailStatus) => {
+                                        if (detailStatus === google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
+                                            resolve({
+                                                id: prediction.place_id,
+                                                text: place.name || prediction.structured_formatting.main_text,
+                                                place_name: place.formatted_address || prediction.description,
+                                                center: [
+                                                    place.geometry.location.lng(),
+                                                    place.geometry.location.lat(),
+                                                ],
+                                            })
+                                        } else {
+                                            resolve(null)
+                                        }
+                                    }
+                                )
+                            })
+                    )
+
+                    Promise.all(placePromises).then((results) => {
+                        setPlaces(results.filter((p): p is PlaceResult => p !== null))
+                        setLoading(false)
+                    })
+                } else {
+                    setPlaces([])
+                    setLoading(false)
+                }
+            })
         } catch (error) {
             console.error('Error searching places:', error)
-        } finally {
             setLoading(false)
         }
     }, [userLocation])
