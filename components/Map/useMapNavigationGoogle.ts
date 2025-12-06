@@ -89,7 +89,7 @@ export function useMapNavigationGoogle(map: google.maps.Map | null) {
                 userMarker.current.position = position
             } else {
                 // It's a legacy Marker, use setPosition
-                // @ts-ignore - we know it's a Marker if it's not AdvancedMarkerElement
+                // @ts-ignore-error - we know it's a Marker if it's not AdvancedMarkerElement
                 userMarker.current.setPosition(position)
             }
         } else {
