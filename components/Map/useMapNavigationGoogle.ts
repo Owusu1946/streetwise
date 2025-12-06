@@ -84,7 +84,14 @@ export function useMapNavigationGoogle(map: google.maps.Map | null) {
         const position = { lat: coords[1], lng: coords[0] }
 
         if (userMarker.current) {
-            userMarker.current.position = position
+            // Check if it's an AdvancedMarkerElement (has 'position' property that can be set directly)
+            if (userMarker.current instanceof google.maps.marker.AdvancedMarkerElement) {
+                userMarker.current.position = position
+            } else {
+                // It's a legacy Marker, use setPosition
+                // @ts-ignore - we know it's a Marker if it's not AdvancedMarkerElement
+                userMarker.current.setPosition(position)
+            }
         } else {
             // Create a simple marker using regular Marker for now
             const markerElement = createUserLocationMarkerElement()

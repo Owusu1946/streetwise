@@ -623,6 +623,7 @@ export function TroskiMap({ className = '', onExitTroskiMode }: TroskiMapProps) 
                 <div style="padding: 8px;">
                     <h3 style="font-weight: 600; font-size: 14px;">${journey.route.origin_name}</h3>
                     <p style="font-size: 12px; color: #3b82f6;">Start here</p>
+                    ${journey.route.total_fare ? `<p style="font-size: 12px; font-weight: 600; color: #10b981; margin-top: 4px;">Fare: GH₵${journey.route.total_fare}</p>` : ''}
                 </div>
             `,
         })

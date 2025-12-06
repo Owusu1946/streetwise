@@ -42,6 +42,7 @@ export function TroskiContributeDrawer({
     const [places, setPlaces] = useState<PlaceResult[]>([])
     const [loading, setLoading] = useState(false)
     const [submitting, setSubmitting] = useState(false)
+    const [totalFare, setTotalFare] = useState('')
 
     // Route data
     const [origin, setOrigin] = useState<PlaceResult | null>(null)
@@ -269,6 +270,7 @@ export function TroskiContributeDrawer({
                     destination_name: destination.text,
                     destination_latitude: destination.center[1],
                     destination_longitude: destination.center[0],
+                    total_fare: totalFare ? parseFloat(totalFare) : undefined,
                     stops: stops.map((s) => ({
                         stop_name: s.name,
                         stop_latitude: s.latitude,
@@ -608,6 +610,26 @@ export function TroskiContributeDrawer({
                                             <p className="text-xs text-muted-foreground">End</p>
                                             <p className="font-medium text-sm">{destination?.text}</p>
                                         </div>
+                                    </div>
+
+                                    {/* Total Fare Input */}
+                                    <div className="pt-2">
+                                        <label className="text-sm font-medium mb-1.5 block">Total Fare (GHS)</label>
+                                        <div className="relative">
+                                            <Input
+                                                type="number"
+                                                placeholder="e.g. 15.00"
+                                                value={totalFare}
+                                                onChange={(e) => setTotalFare(e.target.value)}
+                                                className="w-full h-12 pl-10 text-base"
+                                                min="0"
+                                                step="0.50"
+                                            />
+                                            <div className="absolute left-3 top-3.5 font-semibold text-muted-foreground">₵</div>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground mt-1.5">
+                                            Optional. Helps others estimate their trip cost.
+                                        </p>
                                     </div>
                                 </div>
 
